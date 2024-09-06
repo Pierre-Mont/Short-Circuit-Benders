@@ -26,8 +26,9 @@ class MyInstance{
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
+	int ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork;
 
-	void fromFile(const std::string& inputFile) {
+	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in) {
         ifstream file(inputFile);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile << std::endl;
@@ -35,6 +36,10 @@ class MyInstance{
 		int count = 0;
 		string line;
 		NbOptCut=0;
+		ImprovedFeasCut=ImprovedFeasCut_in;
+		MoreCuts=MoreCuts_in;
+		SigmaCuts=SigmaCuts_in;
+		NoMaxWork=NoMaxWork_in;
 		NbFeasCut=0;
         while (getline(file, line)) {
 			istringstream iss(line);
