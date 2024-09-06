@@ -1,6 +1,8 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 #include "MyInstance.hpp"
+#include <chrono>
+
 ILOSTLBEGIN
 
 
@@ -529,29 +531,33 @@ int mainBend(MyInstance Inst)
 		WorkerCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
 		WorkerCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
 		WorkerCplex.setWarning(env.getNullStream());
-		int maxIterations=100,iter=0;
+		int maxIterations=1000,iter=0;
 		bool AlreadyAdded, GetOut=false;
 		vector<int> NodeSub,dem;
 		pair<vector<int>,vector<int>> PickAndDel,DemandPickAndDel(vector<int>(Inst.node,0),vector<int>(Inst.node,0));
 		IloConstraintArray AddCuts(env);
 		float lower=0,BestUpper=10000,upper=0,epsi = 1e-5,tot;
 		vector<array<int,3>> VarPick, VarDeli,empt;
-		double globlasolve=0;
     	MasterCplex.exportModel("filemas.lp");	
+		auto start = std::chrono::high_resolution_clock::now();
+
+
+		std::chrono::duration<double> MasterSolving(0.0),SubSolving(0.0);
 
 		// Loop through each Benders iteration
 		while(iter < maxIterations && !GetOut){
 			// Solve master problem
-			double start=MasterCplex.getTime();
+			auto startMaster = std::chrono::high_resolution_clock::now();
 			MasterCplex.solve();
-			double end = MasterCplex.getTime();
-			globlasolve+=end-start;
+			auto endMaster = std::chrono::high_resolution_clock::now();
+
+			MasterSolving+=endMaster-startMaster;
 			AddCuts.clear();
 			//MasterCplex.exportModel("filemas2.lp");	
 
 			double value;
 			if (MasterCplex.getStatus() == IloAlgorithm::Optimal){
-				assert(lower <= MasterCplex.getObjValue());
+				assert(lower <= MasterCplex.getObjValue() + epsi);
 				lower=MasterCplex.getObjValue(); 
 
 				upper=0;
@@ -670,8 +676,10 @@ int mainBend(MyInstance Inst)
 									GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
 									//WorkerCplex.exp ortModel("file.sav");
 
+									auto startMaster = std::chrono::high_resolution_clock::now();
 									WorkerCplex.solve();
-
+									auto endMaster = std::chrono::high_resolution_clock::now();
+									SubSolving+=endMaster-startMaster;
 									IloAlgorithm::Status status = WorkerCplex.getStatus();  // Get the termination status
 									if (status == IloAlgorithm::Optimal) {  // If the status is optimal
 										res[s]=WorkerCplex.getObjValue();         // Return the objective value
@@ -724,7 +732,7 @@ int mainBend(MyInstance Inst)
 						}		  
 					}
 				}
-				if(MasterCplex.getTime()+WorkerCplex.getTime()>1800){
+				if(SubSolving.count()+MasterSolving.count()>1800){
 					GetOut=true;
 					cout<<"Time limit"<<endl;
 					for (int i = 0; i < Inst.Np; i++){
@@ -771,12 +779,15 @@ int mainBend(MyInstance Inst)
 			
 			iter+=1;
       	}
-		cout<<globlasolve<<endl;
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> duration = end - start;
+
+		cout<<"Total time "<<duration.count()<<endl;
 		cout<<"Iteration "<<iter<<endl;
 		cout<<"Upper "<<BestUpper<<endl;
 		cout<<"Lower "<<lower<<endl;
-		cout<<"Master Solving "<<MasterCplex.getTime()<<endl;
-		cout<<"Sub Solving "<<WorkerCplex.getTime()<<endl;
+		cout<<"Master Solving "<<MasterSolving.count()<<endl;
+		cout<<"Sub Solving "<<SubSolving.count()<<endl;
 		cout<<"NbFeas "<<Inst.NbFeasCut<<endl;
 		cout<<"NbOpt "<<Inst.NbOptCut<<endl;
 		AddCuts.end();

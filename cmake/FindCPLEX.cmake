@@ -60,8 +60,9 @@ if(WIN32)
     set(CPLEX_WIN_PLATFORM "${CPLEX_WIN_BITNESS}_windows_vs${CPLEX_WIN_VS_VERSION}/stat_${CPLEX_WIN_LINKAGE}")
 
 else()
-
-    set(CPLEX_ROOT_DIR "" CACHE PATH "CPLEX root directory.")
+    
+    set(CPLEX_ROOT_DIR "/opt/ibm/ILOG/CPLEX_Studio2211/")
+   
     set(CPLEX_WIN_PLATFORM "")
 
 endif()

@@ -96,10 +96,10 @@ if length(ARGS) < 1
     ## Number of vehicles
     
 
-    CapaProd=50
-    CapaHub=60
-    WorkProd=30
-    WorkHub=60
+    CapaProd=60
+    CapaHub=100
+    WorkProd=40
+    WorkHub=100
     TourHub=3
     MaxSize=3
     MaxCo=10
@@ -150,27 +150,43 @@ x_p, y_p = rand(Np), rand(Np)
 
 ## Hub' potential locations
 x_h, y_h = rand(Nh), rand(Nh)
-
-## Node position
-x_all, y_all=rand(0:MaxCo,Np+Nh+Nc+Nh), rand(0:MaxCo,Np+Nh+Nc+Nh)
-## Distance
-dist = zeros(node, node)
+maxite=100000
+ite=1 
 dist2 = zeros(node, node)
-for i in 1:Np+Nc+Nh
-    for j in 1:Np+Nc+Nh
-        dist2[i, j] = LinearAlgebra.norm([x_all[i] - x_all[j], y_all[i] - y_all[j]], 2)
+atleast1C=zeros(Nc)
+test=true
+while(test && ite<maxite)
+    global test=false
+    ## Node position
+    global x_all, y_all=rand(0:MaxCo,Np+Nh+Nc+Nh), rand(0:MaxCo,Np+Nh+Nc+Nh)
+    ## Distance
+    
+    for i in 1:Np+Nc+Nh
+        for j in 1:Np+Nc+Nh
+            dist2[i, j] = LinearAlgebra.norm([x_all[i] - x_all[j], y_all[i] - y_all[j]], 2)
+            if(i<=Np && j>Np+Nh && j<=Np+Nh+Nc && atleast1C[j-Np-Nh]==false && dist2[i, j] <= WorkProd/2)
+                atleast1C[j-Np-Nh]=true
+            end
+
+        end
+        for j in 1:Nh
+            dist2[i, j+Np+Nc+Nh] = LinearAlgebra.norm([x_all[i] - x_all[j+Np], y_all[i] - y_all[j+Np]], 2)
+        end
     end
-    for j in 1:Nh
-        dist2[i, j+Np+Nc+Nh] = LinearAlgebra.norm([x_all[i] - x_all[j+Np], y_all[i] - y_all[j+Np]], 2)
+    for i in 1:Nh
+        for j in 1:Np+Nc+Nh
+            dist2[i+Np+Nc+Nh, j] = LinearAlgebra.norm([x_all[i+Np] - x_all[j], y_all[i+Np] - y_all[j]], 2)
+        end
+        for j in 1:Nh
+            dist2[i+Np+Nc+Nh, j+Np+Nc+Nh] = LinearAlgebra.norm([x_all[i+Np] - x_all[j+Np], y_all[i+Np] - y_all[j+Np]], 2)
+        end
     end
-end
-for i in 1:Nh
-    for j in 1:Np+Nc+Nh
-        dist2[i+Np+Nc+Nh, j] = LinearAlgebra.norm([x_all[i+Np] - x_all[j], y_all[i+Np] - y_all[j]], 2)
+    for c in 1:Nc
+        if(atleast1C==false)
+            test=true
+        end
     end
-    for j in 1:Nh
-        dist2[i+Np+Nc+Nh, j+Np+Nc+Nh] = LinearAlgebra.norm([x_all[i+Np] - x_all[j+Np], y_all[i+Np] - y_all[j+Np]], 2)
-    end
+    global ite+=1;
 end
 rounded_matrix = round.(dist2, digits=2)
 
@@ -235,8 +251,8 @@ end
 test=true
 Psize = rand(1:MaxSize,Nk)
 DeliWindowsF=zeros(Nc,Nk,2)
-
-while(test)
+ite=1
+while(test && ite<maxite)
     global test=false
     global demands = rand(0:MaxDemand,Nc,Nk)
     global stocks = rand(0:MaxStock,Np,Nk)
@@ -282,6 +298,26 @@ while(test)
             test=true
         end
     end
+    if test==false
+        for c in 1:Nc
+            for k in 1:Nk
+                if demands[c,k]>0
+                    p=1
+                    foundone=false
+                    while(p<=Np && foundone==false)
+                        if(stocks[p,k]>=demands[c,k] && dist2[p,c+Np+Nh]<= WorkProd /2)
+                            foundone=true
+                        end
+                        p+=1
+                    end
+                    if(foundone==false)
+                        test=true
+                    end
+                end
+            end
+        end
+    end
+    global ite+=1
 end
 matrixDeliWindows = reshape(DeliWindows, Nc, Nk,2)
 
@@ -290,7 +326,8 @@ sizeP=Np+Nh
 sizeC=Nc+Nh
 
 test=true 
-while(test)
+ite=1
+while(test && ite<maxite)
     global Prod_av=rand(0:1, Np,Nt)
     c=1
     global test=false
@@ -314,9 +351,11 @@ while(test)
         end
         c+=1
     end
+    global ite+=1
 end
 Client_av=rand(0:1,Nc,Nt)
 Experiation_date=rand(1:Nt,Nk)
+test=true
 for c in 1:Nc
     global test=true
     while(test)
@@ -387,9 +426,9 @@ set_silent(model)
 
 ##@constraint(model, WorkingHourProd0[t in 1:Nt, ii in 1:Np, v in Vehicles[ii]], sum(x[i, j, t ,v, r]*dist2[i,j] for j in 1:node for i in 1:node if i!=j for r in 1:TourVehicle[v])<=0);
 
-
-    instance_name = "Full_$(Np)_$(Nc)_$(Nh)_$(se).lp"
-file_path = "Full_$(Np)_$(Nc)_$(Nh)_$(se).data"
+instance_name = replace(filename, ".txt" => ".lp")
+file_path = replace(filename, ".txt" => ".data")
+println(instance_name)
 open(file_path, "w") do file
     # Write to the file
     write(file, "$Np $Nc $Nh $Nk $Nvh $CapaProd $WorkProd $CapaHub $WorkHub $Nt $TourHub\n")
