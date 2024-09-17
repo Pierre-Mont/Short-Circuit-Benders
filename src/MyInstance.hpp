@@ -17,7 +17,7 @@ float round2d(float var)
 }
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode;
 	vector<float> MinDist;
 	vector<vector<float>> dist;
 	//For Debugging
@@ -26,9 +26,9 @@ class MyInstance{
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
-	int ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork;
+	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
 
-	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in) {
+	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in) {
         ifstream file(inputFile);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile << std::endl;
@@ -36,10 +36,15 @@ class MyInstance{
 		int count = 0;
 		string line;
 		NbOptCut=0;
-		ImprovedFeasCut=ImprovedFeasCut_in;
+		MaxNode=0;
+		MinNode=1000;
+		ImprovedCut=ImprovedFeasCut_in;
 		MoreCuts=MoreCuts_in;
 		SigmaCuts=SigmaCuts_in;
 		NoMaxWork=NoMaxWork_in;
+		WarmStart=WarmStart_in;
+		NbNodeSubs=0;
+		NbSolvedSubs=0;
 		NbFeasCut=0;
         while (getline(file, line)) {
 			istringstream iss(line);
@@ -115,8 +120,10 @@ class MyInstance{
 					dist.push_back({});
 					for (int j = 0; j < node; j++){
 						iss >> re;
-						if(i!=j && MinD>re)
-							MinD=round2d(re);
+						if(i!=j && MinD>re){
+							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
+								MinD=round2d(re);
+						}
 						dist.back().push_back(round2d(re));
 					}
 					MinDist.push_back(MinD);

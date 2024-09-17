@@ -401,6 +401,8 @@ set_silent(model)
 @constraint(model, Expi[i in 1:Np, k in 1:Nk,  c in 1:Nc, t in 1:Nt, tt in 1:Nt; tt<t || tt> t+Experiation_date[k] ], sum(w[i, t, v, r, k, c] for v in 1:Nv for r in 1:TourVehicle[v]) <= 1-sum(w[Cmoins[c], tt, v, r, k, c] for v in 1:Nv for r in 1:TourVehicle[v]));
 
 @constraint(model, OneTour[i in Pplus, t in 1:Nt, v in Vehicles[i], r in 1:TourVehicle[v]], sum(x[i, j, t ,v, r] for j in 1:node if j!=i)<=1);
+@constraint(model, VisitOnce[i in 1:node, t in 1:Nt, v in 1:Nv; i!=StartVehicle[v]], sum(x[i, j, t ,v, r] for j in 1:node for r in 1:TourVehicle[v] if j!=i)<=1);
+
 @constraint(model, flow[i in 1:node, t in 1:Nt, v in 1:Nv, r in 1:TourVehicle[v]], sum(x[i, j, t ,v, r] for j in 1:node if j != i)==sum(x[j, i, t ,v, r] for j in 1:node if j != i));
 @constraint(model, WorkingHour[t in 1:Nt, v in 1:Nv], sum(x[i, j, t ,v, r]*dist2[i,j] for j in 1:node for i in 1:node if i!=j for r in 1:TourVehicle[v])<=WorkVehicle[v]);
 
@@ -419,6 +421,8 @@ set_silent(model)
 @constraint(model, TooFarPoint[i in 1:Np, c in 1:Nc; dist2[i,c+Np+Nh] > WorkProd /2], sum(f[i,k,c]  for k in 1:Nk) == 0);
 
 @constraint(model, subtour[v in 1:Nv, t in 1:Nt, r in 1:TourVehicle[v], i in 1:node, j in 1:node; i!=j && StartVehicle[v]!=i && StartVehicle[v]!=j], u[i,t,v,r]-u[j,t,v,r]+node*x[i,j,t,v,r]+(node-2)*x[j,i,t,v,r] <= node-1);
+
+
 ##@constraint(model, subtourqNp[t in 1:Nt, i in Pplus, k in 1:Nk, c in 1:Nc, v in 1:Nv], sum(q[j,i,t,v,k,c] for j in 1:node if j != i)+sum(w[i, t, v, r, k, c] for r in 1:TourVehicle[v])==sum(q[i,j,t,v,k,c] for j in 1:node if j != i));
 ##@constraint(model, subtourqNc[t in 1:Nt, i in Cmoins, k in 1:Nk, c in 1:Nc, v in 1:Nv], sum(q[j,i,t,v,k,c] for j in 1:node if j != i)==sum(q[i,j,t,v,k,c] for j in 1:node if j != i)+sum(w[i, t, v, r, k, c] for r in 1:TourVehicle[v]));
 ##@constraint(model, qneedx[i in 1:node, j in 1:node, t in 1:Nt, v in 1:Nv, k in 1:Nk, c in 1:Nc; i!=j], q[i, j, t, v, k, c] <= sum(x[i,j,t,v,r] for r in 1:TourVehicle[v]));
