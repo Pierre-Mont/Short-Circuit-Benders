@@ -1115,8 +1115,7 @@ int mainBend(MyInstance Inst)
 							}
 						}
 					}
-				}else
-					MasterModel.add(AddCuts);
+				}
 				if(upper < BestUpper)
 					BestUpper=upper;
 				if(Inst.WarmStart==1)
@@ -1180,6 +1179,7 @@ int mainBend(MyInstance Inst)
 				GetOut=true;
 			}
 			
+			MasterModel.add(AddCuts);
 			iter+=1;
       	}
 		auto end = std::chrono::high_resolution_clock::now();
