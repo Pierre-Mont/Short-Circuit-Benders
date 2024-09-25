@@ -1,7 +1,7 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
-#include "MyInstance.hpp"
 #include <chrono>
+#include "MyInstance.hpp"
 
 ILOSTLBEGIN
 
@@ -791,6 +791,67 @@ void AddMoreOptCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArra
 		}
 	}
 }
+
+
+std::string exec(const char* cmd) {
+    char buffer[128];
+    std::string result = "";
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    try {
+        while (fgets(buffer, sizeof buffer, pipe) != NULL) 
+            result += buffer;
+    } catch (...) {
+        pclose(pipe);
+        throw;
+    }
+    pclose(pipe);
+    return result;
+}
+float SolveWithBapcod(int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand)
+{
+    std::ofstream outfile("VRPTW/Bap.txt");
+    
+    // Check if the file opened successfully
+    if (!outfile.is_open()) {
+        std::cerr << "Failed to open the file." << std::endl;
+    }
+
+    outfile << "C201\n\n";
+    outfile << "VEHICLE\n";
+    outfile << "NUMBER     CAPACITY\n";
+    outfile << std::setw(5) << maxNbVehicles << std::setw(11) << capacity << "\n\n";
+    outfile << "CUSTOMER\n";
+    outfile << "CUST NO.  XCOORD.    YCOORD.    DEMAND   READY TIME  DUE DATE   SERVICE TIME\n\n";
+
+    // Loop over customers and write their data
+    for (int i = 0; i < nbCust; ++i) {
+        outfile << std::setw(5) << i << std::setw(10) << xCoord[i] << std::setw(11) << yCoord[i]
+                << std::setw(11) << demand[i] << std::setw(13) << 0 << std::setw(10) << 10000
+                << std::setw(13) << 0 << "\n";
+    }
+
+    // Close the file
+    outfile.close();
+    string command="../VehicleRoutingWithTimeWindowsDemo -b ../BapCod_conf/bc.cfg -a ../BapCod_conf/app.cfg -i VRPTW/Bap.txt | awk 'BEGIN { statut = 0; opt = 0 } "
+                          "/infeasibility/ { statut = -1; opt = -1 } "
+                          "/Best found solution of value [0-9]+/ { statut = 1; match($0, /value ([0-9]+\\.[0-9]+)/, arr); opt = arr[1] } "
+                          "END { print \"\" statut \" \" opt }'";
+    
+    string output = exec(command.c_str());
+    int statut = 0;
+    float opt = 0.0f;
+    
+    sscanf(output.c_str(), "%d %f", &statut, &opt);  // Scan output into C++ variables
+    
+    if(statut!=1){
+        assert(opt==-1);
+    }
+    return opt;
+}
+
+
+
 int mainBend(MyInstance Inst)
 {
 	try {
@@ -835,8 +896,8 @@ int mainBend(MyInstance Inst)
 		float lower=0,BestUpper=10000,upper=0,epsi = 1e-5,tot;
 		vector<array<int,3>> VarPick, VarDeli,empt;
     	MasterCplex.exportModel("filemas.lp");	
+		
 		auto start = std::chrono::high_resolution_clock::now();
-
 		
 		std::chrono::duration<double> MasterSolving(0.0),SubSolving(0.0);
 		cout<<"Solve the Problem"<<endl;
@@ -989,21 +1050,52 @@ int mainBend(MyInstance Inst)
 									WorkerModel.remove(cons);
 									cons.endElements();
 									cons.end();
-									//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<endl;
-									//cout<<NodeSub<<endl;
-									GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-									//WorkerCplex.exportModel("file.sav");
-									
+
 									auto startMaster = std::chrono::high_resolution_clock::now();
-									WorkerCplex.solve();
+									if(Inst.Bapcod==0 || NodeSub.size()<=3){
+										//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<endl;
+										//cout<<NodeSub<<endl;
+										GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
+										//WorkerCplex.exportModel("file.sav");
+										WorkerCplex.solve();
+										if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
+											res[s]=WorkerCplex.getObjValue();
+											upper+=res[s];
+											tot+=res[s];	
+										}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
+											res[s]=-1;
+											upper+=1000;
+										}else {  // For all other cases
+											std::cerr << "Subproblem Solving failed" << std::endl;
+											res[s]=-2;  // Optionally return -1 to indicate failure
+										}
+									}else{
+										vector<int> xCoord,yCoord,demandbap;
+										for (int i = 0; i < (int) NodeSub.size(); i++)
+										{
+											xCoord.push_back(Inst.x_all[NodeSub[i]]);
+											yCoord.push_back(Inst.y_all[NodeSub[i]]);
+											demandbap.push_back(dem[NodeSub[i]]);
+											
+										}
+										assert(demandbap[0]==0);
+
+										res[s]=SolveWithBapcod(Inst.TourVehicle[v],Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap);
+										if(res[s]==-1)
+											upper+=1000;
+										else{
+											upper+=res[s];
+											tot+=res[s];
+										}
+									}
+									
 									auto endMaster = std::chrono::high_resolution_clock::now();
 									SubSolving+=endMaster-startMaster;
-									IloAlgorithm::Status status = WorkerCplex.getStatus();  // Get the termination status
-									if (status == IloAlgorithm::Optimal) {  // If the status is optimal
+									/*if (status == IloAlgorithm::Optimal) {  // If the status is optimal
 										res[s]=WorkerCplex.getObjValue();         // Return the objective value
 										upper+=res[s];
 										tot+=res[s];
-										/*cout<<"Real Cost "<<res[s]<<endl;
+										cout<<"Real Cost "<<res[s]<<endl;
 										//WorkerCplex.exportModel("filework.lp");
 										for (int i = 0; i < (int) NodeSub.size(); i++)
 										{
@@ -1016,18 +1108,8 @@ int mainBend(MyInstance Inst)
 													}
 												}
 											}
-										}*/
-									} 
-									else if (status == IloAlgorithm::Infeasible) {  // If the status is infeasible
-										res[s]=-1;                                  // Return -1
-										//cout<<"SUB PROBLEM IS UNFEASIBLE"<<endl;
-										upper+=1000;
-										UNF=true;
-									} 
-									else {  // For all other cases
-										std::cerr << "Subproblem Solving failed" << std::endl;
-										res[s]=-2;  // Optionally return -1 to indicate failure
-									}
+										}
+									}*/ 
 									if(res[s]==-1){
 										if(s==1){
 											if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v]){

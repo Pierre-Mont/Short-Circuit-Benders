@@ -17,18 +17,18 @@ float round2d(float var)
 }
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,MoreSubs;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod;
 	vector<float> MinDist;
 	vector<vector<float>> dist;
 	//For Debugging
-	//vector<int> x_all, y_all, x_c, y_c, x_p, y_p, x_h, y_h;
+	vector<int> x_all, y_all; // x_c, y_c, x_p, y_p, x_h, y_h;
 	vector<int>  Experiation_date, Psize,  Pplus ,Cmoins, StartVehicle, CapaVehicle, WorkVehicle, TourVehicle;
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
 
-	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int MoreSubs_in) {
+	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in) {
         ifstream file(inputFile);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile << std::endl;
@@ -44,8 +44,8 @@ class MyInstance{
 		NoMaxWork=NoMaxWork_in;
 		WarmStart=WarmStart_in;
 		PartialCut=PartialCut_in;
+		Bapcod=Bapcod_in;
 		CapH=CapH_in;
-		MoreSubs=MoreSubs_in;
 		NbNodeSubs=0;
 		NbSolvedSubs=0;
 		NbFeasCut=0;
@@ -138,19 +138,16 @@ class MyInstance{
 					iss >> re;
 					Psize.push_back(re);	
 				}
-			}/* For debugging
-			else if(count == 9){
+			}else if(count == 9){
 				int re;
-				for (int i = 0; i < Nk; i++)
+				for (int i = 0; i < node; i++)
 				{
 					iss >> re;
 					x_all.push_back(re);
 					iss >> re;
 					y_all.push_back(re);	
 				}
-			}*/
-		// Continue reading file and filling matrices
-		// ...
+			}
 			count++;
 		}
 		for (int i = 0; i < Np; i++) {

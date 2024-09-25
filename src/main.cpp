@@ -7,7 +7,8 @@
 #include <unistd.h>
 #include <cassert>
 #include "Bender.hpp"
-	
+
+
 int main(int argc, char *argv[]) {
     
 	// Initialize variables
@@ -20,7 +21,7 @@ int main(int argc, char *argv[]) {
 	int WarmStart=0;
 	int CapH=0;
 	int PartialCut=0;
-	int MoreSubs=0;
+	int Bapcod=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -46,8 +47,8 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-PC=") == 0) {
 			PartialCut = std::stoi(arg.substr(4));
 		}
-		if(arg.find("-MS=") == 0) {
-			MoreSubs = std::stoi(arg.substr(4));
+		if(arg.find("-BC=") == 0) {
+			Bapcod = std::stoi(arg.substr(4));
 		}
     }
 	// Initialize data containers
@@ -59,7 +60,7 @@ int main(int argc, char *argv[]) {
 	}
 	MyInstance Inst;
 	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,MoreSubs);
+	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod);
 	
 	// Model the problem
 	
