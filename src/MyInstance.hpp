@@ -17,7 +17,7 @@ float round2d(float var)
 }
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero;
 	vector<float> MinDist;
 	vector<vector<float>> dist;
 	//For Debugging
@@ -28,7 +28,7 @@ class MyInstance{
 	vector<pair<int,int>> PairHub;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
 
-	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in) {
+	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in) {
         ifstream file(inputFile);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile << std::endl;
@@ -46,9 +46,14 @@ class MyInstance{
 		PartialCut=PartialCut_in;
 		Bapcod=Bapcod_in;
 		CapH=CapH_in;
+		FReal=FReal_in;
+		NoObj=NoObj_in;
+		ToleranceOK=ToleranceOK_in;
+		Gap=Gap_in;
 		NbNodeSubs=0;
 		NbSolvedSubs=0;
 		NbFeasCut=0;
+		MoreZero=MoreZero_in;
         while (getline(file, line)) {
 			istringstream iss(line);
 			if (count == 0) {

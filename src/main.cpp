@@ -22,6 +22,11 @@ int main(int argc, char *argv[]) {
 	int CapH=0;
 	int PartialCut=0;
 	int Bapcod=0;
+	int FReal=0;
+	int NoObj=0;
+	int ToleranceOK=0;
+	int Gap=0;
+	int MoreZero=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -50,6 +55,21 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-BC=") == 0) {
 			Bapcod = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-FR=") == 0) {
+			FReal = std::stoi(arg.substr(4));
+		}
+		if(arg.find("-NO=") == 0) {
+			NoObj = std::stoi(arg.substr(4));
+		}
+		if(arg.find("-TO=") == 0) {
+			ToleranceOK = std::stoi(arg.substr(4));
+		}
+		if(arg.find("-GAP=") == 0) {
+			Gap = std::stoi(arg.substr(5));
+		}
+		if(arg.find("-MZ=") == 0) {
+			MoreZero = std::stoi(arg.substr(4));
+		}
     }
 	// Initialize data containers
 	// Read the file
@@ -60,7 +80,7 @@ int main(int argc, char *argv[]) {
 	}
 	MyInstance Inst;
 	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod);
+	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero);
 	
 	// Model the problem
 	

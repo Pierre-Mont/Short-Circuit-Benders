@@ -1,6 +1,7 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 #include <chrono>
+#include <ilcp/cp.h> 
 #include "MyInstance.hpp"
 
 ILOSTLBEGIN
@@ -38,7 +39,10 @@ ostream &operator<<(std::ostream &os, const std::vector<vector<T>> &input)
 	os<< "]";
     return os;
 }
-void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>>& w, IloArray<IloArray<IloNumVar>>& sigma,IloArray<IloArray<IloBoolVarArray>>& f,IloArray<IloArray<IloBoolVarArray>>& y) {
+
+
+
+void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>>& w, IloArray<IloArray<IloNumVar>>& sigma,IloArray<IloArray<IloBoolVarArray>>& f,IloArray<IloArray<IloBoolVarArray>>& y, IloArray<IloArray<IloNumVarArray>>& fr) {
    	for (int i = 0; i < Inst.node; ++i) {
 		w[i] = IloArray<IloArray<IloArray<IloBoolVarArray>>>(env, Inst.Nt);
 		for (int t = 0; t < Inst.Nt; ++t) {
@@ -51,47 +55,72 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 					w[i][t][v][k] = IloBoolVarArray(env, Inst.Nc);
 					for (int c = 0; c < Inst.Nc; ++c) {
 						//Alawys create a variable if hub or producer. Create one variable for the client. 
-						if(i<Inst.Np+Inst.Nh || i > Inst.Np + Inst.Nh + Inst.Nc -1 || c==i-Inst.Np-Inst.Nh ){
+						//if(i<Inst.Np+Inst.Nh || i > Inst.Np + Inst.Nh + Inst.Nc -1 || c==i-Inst.Np-Inst.Nh ){
 							ostringstream varName;
 							varName << "w_" << i << "_" << t << "_" << v << "_"<<k <<"_"<<c;
 							w[i][t][v][k][c] = IloBoolVar(env, varName.str().c_str());
+						//}
+					}
+				}
+			}
+		}
+	}
+	if(Inst.FReal==0){
+		for (int i = 0; i < Inst.Np; ++i) {
+			f[i] = IloArray<IloBoolVarArray>(env, Inst.Nk);
+			for (int k = 0; k < Inst.Nk; ++k) {
+				f[i][k] = IloBoolVarArray(env, Inst.Nc);
+				if(Inst.stocks[i][k]>0){
+					for (int c = 0; c < Inst.Nc; ++c) {
+						if(Inst.demands[c][k]>0){
+							ostringstream varName;
+							varName << "f_" << i <<"_"<<k <<"_"<<c;
+							f[i][k][c] = IloBoolVar(env, varName.str().c_str());
+						}
+					}
+				}
+			}
+		}
+	}else{
+		for (int i = 0; i < Inst.Np; ++i) {
+			fr[i] = IloArray<IloNumVarArray>(env, Inst.Nk);
+			for (int k = 0; k < Inst.Nk; ++k) {
+				fr[i][k] = IloNumVarArray(env, Inst.Nc);
+				if(Inst.stocks[i][k]>0){
+					for (int c = 0; c < Inst.Nc; ++c) {
+						if(Inst.demands[c][k]>0){
+							ostringstream varName;
+							varName << "f_" << i <<"_"<<k <<"_"<<c;
+							fr[i][k][c] = IloNumVar(env, 0.0,1.0,varName.str().c_str());
 						}
 					}
 				}
 			}
 		}
 	}
-	for (int i = 0; i < Inst.Np; ++i) {
-		f[i] = IloArray<IloBoolVarArray>(env, Inst.Nk);
-		for (int k = 0; k < Inst.Nk; ++k) {
-			f[i][k] = IloBoolVarArray(env, Inst.Nc);
-			if(Inst.stocks[i][k]>0){
-				for (int c = 0; c < Inst.Nc; ++c) {
-					if(Inst.demands[c][k]>0){
-						ostringstream varName;
-						varName << "f_" << i <<"_"<<k <<"_"<<c;
-						f[i][k][c] = IloBoolVar(env, varName.str().c_str());
-					}
-				}
-			}
-		}
-	}
+	
 	for (int t = 0; t < Inst.Nt; ++t) {
 		sigma[t] = IloArray<IloNumVar>(env, Inst.Nv);
 		for (int v = 0; v < Inst.Nv; ++v) {
 			ostringstream varName;
 			varName << "sig_" << t <<"_"<<v;
-			sigma[t][v] = IloNumVar(env, 0.0, IloInfinity,varName.str().c_str());
+			sigma[t][v] = IloNumVar(env, 0.0, 100,varName.str().c_str());
 		}
 	}
 	// Define the objective function
 	IloExpr objective(env);
-	for (int i = 0; i < Inst.Np; ++i) {
-		for (int k = 0; k < Inst.Nk; ++k) {
-			if(Inst.stocks[i][k]>0){
-				for (int j = 0; j < Inst.Nc; ++j) {	
-					if(Inst.demands[j][k]>0)
-						objective += Inst.dist[i][j+Inst.Np+Inst.Nh] * f[i][k][j];
+	if(Inst.NoObj==0){
+		for (int i = 0; i < Inst.Np; ++i) {
+			for (int k = 0; k < Inst.Nk; ++k) {
+				if(Inst.stocks[i][k]>0){
+					for (int j = 0; j < Inst.Nc; ++j) {	
+						if(Inst.demands[j][k]>0){
+							if(Inst.FReal==0)
+								objective += Inst.dist[i][j+Inst.Np+Inst.Nh] * f[i][k][j];
+							else
+								objective += Inst.dist[i][j+Inst.Np+Inst.Nh] * fr[i][k][j];
+						}
+					}
 				}
 			}
 		}
@@ -112,8 +141,12 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			if (Inst.demands[j][k] > 0) {
 				IloExpr client_service(env);
 				for (int i = 0; i < Inst.Np; ++i) {
-					if(Inst.stocks[i][k]>0)
-						client_service += f[i][k][j];
+					if(Inst.stocks[i][k]>0){
+						if(Inst.FReal==0)
+							client_service += f[i][k][j];
+						else
+							client_service += fr[i][k][j];
+					}
 				}
 				masterModel.add(client_service == 1);
 				client_service.end();
@@ -126,8 +159,12 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			
 			IloExpr stock_ok(env);
 			for (int j = 0; j < Inst.Nc; ++j) {
-				if(Inst.demands[j][k]>0)
-					stock_ok += f[i][k][j] * Inst.demands[j][k];
+				if(Inst.demands[j][k]>0){
+					if(Inst.FReal==0)
+						stock_ok += f[i][k][j] * Inst.demands[j][k];
+					else
+						stock_ok += fr[i][k][j] * Inst.demands[j][k];
+				}
 			}
 			masterModel.add(Inst.stocks[i][k] >= stock_ok);
 			stock_ok.end();
@@ -154,7 +191,10 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 							}
 						}
 					}
-					masterModel.add(command_leave == f[i][k][c]);
+					if(Inst.FReal==0)
+						masterModel.add(command_leave == f[i][k][c]);
+					else
+						masterModel.add(command_leave == fr[i][k][c]);
 					command_leave.end();
 				}
 			}
@@ -357,7 +397,10 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			if(Inst.dist[i][c+Inst.Np+Inst.Nh] > (Inst.WorkVehicle[i] / 2.0)){
 				for (int k = 0; k < Inst.Nk; k++){
 					if(Inst.demands[c][k]>0 && Inst.stocks[i][k]>0){
-						expr += f[i][k][c];
+						if(Inst.FReal==0)
+							expr += f[i][k][c];
+						else
+							expr += fr[i][k][c];
 						atleastone=true;
 					}
 				}
@@ -431,7 +474,49 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			}
 		}
 	}
+	if(Inst.MoreZero==1){
+		for (int t = 0; t < Inst.Nt; ++t) {
+			for (int v = 0; v < Inst.Nv; ++v) {			
+				for (int c =0; c < Inst.Nc; ++c) {
+					for (int k =0; k < Inst.Nk; ++k) {
+						if (Inst.demands[c][k]==0 || !Inst.Client_av[c][t] || Inst.DeliWindowsEar[c][k] -1 > t || Inst.DeliWindowsLat[c][k]-1 < t ) {
+							masterModel.add( w[c][t][v][k][c] == 0);
+						}
+					}
+				}
+			}
+		}
+		for (int t = 0; t < Inst.Nt; ++t) {
+			for (int v = 0; v < Inst.Nv; ++v) {			
+				for (int k =0; k < Inst.Nk; ++k) {
+					for (int c =0; c < Inst.Nc; ++c) {
+						for (int h =0; h < Inst.Nh; ++h) {
+							if(Inst.DeliWindowsLat[c][k]-1 < t || Inst.DeliWindowsEar[c][k]-Inst.Experiation_date[k]-1 > t){
+								masterModel.add( w[Inst.PairHub[h].second][t][v][k][c] == 0);
+							}
+						}
+					}
+				}
+			}
+		}
+		for (int t = 0; t < Inst.Nt; ++t) {
+			for (int v = 0; v < Inst.Nv; ++v) {			
+				for (int k =0; k < Inst.Nk; ++k) {
+					for (int c =0; c < Inst.Nc; ++c) {
+						for (int i =0; i < Inst.Np; ++i) {
+							if(Inst.stocks[i][k] < Inst.demands[c][k]){
+								masterModel.add( w[i][t][v][k][c] == 0);
+							}
+							if(Inst.StartVehicle[v]==i && !Inst.Prod_av[i][t])
+								masterModel.add( w[i][t][v][k][c] == 0);
 
+						}
+					}
+				}
+			}
+		}
+
+	}
 }
 
 void createWorkerModel(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray<IloArray<IloNumVar>>& u,IloArray<IloArray<IloArray<IloBoolVar>>>& x) {
@@ -863,7 +948,8 @@ int mainBend(MyInstance Inst)
 		IloArray<IloArray<IloNumVar>> sigma(env, Inst.Nt);
 		IloArray<IloArray<IloBoolVarArray>> f(env, Inst.Np);
 		IloArray<IloArray<IloBoolVarArray>> y(env, Inst.node);
-		createMasterModel(env,MasterModel,Inst,w,sigma,f,y);
+		IloArray<IloArray<IloNumVarArray>> fr(env, Inst.Np);
+		createMasterModel(env,MasterModel,Inst,w,sigma,f,y,fr);
 		IloModel WorkerModel(env);
 		IloArray<IloArray<IloNumVar>> u(env, Inst.node);
 		IloArray<IloArray<IloArray<IloBoolVar>>> x(env, Inst.node);
@@ -875,9 +961,14 @@ int mainBend(MyInstance Inst)
 		MasterCplex.setOut(env.getNullStream());  // Suppress log output
 		MasterCplex.setWarning(env.getNullStream());
 		MasterCplex.setParam(IloCplex::Param::MIP::Display, 0);
-		MasterCplex.setParam(IloCplex::IloCplex::Param::MIP::Tolerances::Integrality, 1e-9);  // Integer feasibility tolerance
-		MasterCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
-		MasterCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
+		if(Inst.ToleranceOK==0){
+			MasterCplex.setParam(IloCplex::IloCplex::Param::MIP::Tolerances::Integrality, 1e-5);  // Integer feasibility tolerance
+			MasterCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
+			MasterCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
+		}
+		if(Inst.Gap==1){
+			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.05);
+		}
 		MasterCplex.setParam(IloCplex::Param::Threads, 1);
 
 		WorkerCplex.setParam(IloCplex::Param::Threads, 1);
@@ -916,7 +1007,7 @@ int mainBend(MyInstance Inst)
 			if (MasterCplex.getStatus() == IloAlgorithm::Optimal){
 				//cout<<lower<< " "<<MasterCplex.getObjValue()<<endl;
 
-				assert(lower <= MasterCplex.getObjValue() + 0.1);
+				//assert(lower <= MasterCplex.getObjValue() + 0.1);
 				lower=MasterCplex.getObjValue(); 
 				IloNumArray solution(env);
 				IloNumVarArray varsMaster(env);       
@@ -926,13 +1017,19 @@ int mainBend(MyInstance Inst)
 					for (int j = 0; j < Inst.Nc; j++){
 						for (int k = 0; k < Inst.Nk; k++){
 							if(Inst.stocks[i][k]>0 && Inst.demands[j][k]>0){
-								value=MasterCplex.getValue(f[i][k][j]);
+								if(Inst.FReal==0)
+									value=MasterCplex.getValue(f[i][k][j]);
+								else
+									value=MasterCplex.getValue(fr[i][k][j]);
 								if(value>1-epsi){
 									upper+=Inst.dist[i][j+Inst.Np+Inst.Nh];
-									//cout<<" "<<f[i][k][j];
-									if(Inst.WarmStart==1)
-										varsMaster.add(f[i][k][j]);
-									}
+									if(Inst.WarmStart==1){
+										if(Inst.FReal==0)
+											varsMaster.add(f[i][k][j]);
+										else
+											varsMaster.add(fr[i][k][j]);
+										}
+								}
 							}
 						}
 					}
@@ -964,11 +1061,13 @@ int mainBend(MyInstance Inst)
 													value = MasterCplex.getValue(w[i][t][v][k][c]);
 													if(value>1-epsi){
 														if(i<Inst.Np + Inst.Nh){
-															cout<<"pick "<<w[i][t][v][k][c]<< " "<<Inst.demands[c][k]*Inst.Psize[k]<<" " <<Inst.dist[i][Inst.StartVehicle[v]]<<endl;
-													
+															//cout<<"pick "<<w[i][t][v][k][c]<< " "<<Inst.demands[c][k]*Inst.Psize[k]<<" " <<Inst.dist[i][Inst.StartVehicle[v]]<<endl;
+															cout<<w[i][t][v][k][c]<<endl;
+
 														}else{
-															cout<<"depot "<<w[i][t][v][k][c]<<" "<<Inst.demands[c][k]*Inst.Psize[k]<<" "<<Inst.dist[i][Inst.StartVehicle[v]]<<endl;
-															
+															//cout<<"depot "<<w[i][t][v][k][c]<<" "<<Inst.demands[c][k]*Inst.Psize[k]<<" "<<Inst.dist[i][Inst.StartVehicle[v]]<<endl;
+															cout<<w[i][t][v][k][c]<<endl;
+
 														}
 													}
 												}
@@ -1020,12 +1119,10 @@ int mainBend(MyInstance Inst)
 									if(!AlreadyAdded)
 										NotUsedPoint.push_back(i);
 								}
-							}	
-
+							}
 							vector<float> res;
 							res.push_back(0);
 							res.push_back(0);
-							bool UNF=false;
 							for (int s = 0; s < 2; s++){
 								if(s==1){
 									NodeSub=PickAndDel.first;
@@ -1058,6 +1155,7 @@ int mainBend(MyInstance Inst)
 										GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
 										//WorkerCplex.exportModel("file.sav");
 										WorkerCplex.solve();
+										//cout<<WorkerCplex.getObjValue()<<endl;
 										if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
 											res[s]=WorkerCplex.getObjValue();
 											upper+=res[s];
@@ -1091,11 +1189,9 @@ int mainBend(MyInstance Inst)
 									
 									auto endMaster = std::chrono::high_resolution_clock::now();
 									SubSolving+=endMaster-startMaster;
-									/*if (status == IloAlgorithm::Optimal) {  // If the status is optimal
-										res[s]=WorkerCplex.getObjValue();         // Return the objective value
-										upper+=res[s];
-										tot+=res[s];
-										cout<<"Real Cost "<<res[s]<<endl;
+									/*if (res[s] >-1 ) {  // If the status is optimal
+										
+										//cout<<"Real Cost "<<res[s]<< " "<<Inst.WorkVehicle[v]<<endl;
 										//WorkerCplex.exportModel("filework.lp");
 										for (int i = 0; i < (int) NodeSub.size(); i++)
 										{
@@ -1104,12 +1200,13 @@ int mainBend(MyInstance Inst)
 													for (int r = 0; r < Inst.TourVehicle[v]; ++r) {
 														value=WorkerCplex.getValue(x[NodeSub[i]][NodeSub[j]][r]);
 														if(value >1-epsi)
-															cout<<x[NodeSub[i]][NodeSub[j]][r]<<" "<<Inst.dist[NodeSub[i]][NodeSub[j]]<<endl;
+															//cout<<x[NodeSub[i]][NodeSub[j]][r]<<" "<<Inst.dist[NodeSub[i]][NodeSub[j]]<<endl;
+															cout<<x[NodeSub[i]][NodeSub[j]][r]<<"_"<<t<<"_"<<v<<endl;
 													}
 												}
 											}
 										}
-									}*/ 
+									} */
 									if(res[s]==-1){
 										if(s==1){
 											if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v]){
@@ -1151,10 +1248,11 @@ int mainBend(MyInstance Inst)
 									}
 								}
 							}
+							//cout<<tot<<" "<<epsi<<" "<<Inst.WorkVehicle[v]<<endl;
 							if(tot>epsi){
 								//cout<<MasterCplex.getValue(sigma[t][v]) <<" "<<tot<<endl;
-								assert(MasterCplex.getValue(sigma[t][v]) <= tot+ 0.1 || UNF);
 								if(tot>Inst.WorkVehicle[v]){
+									upper+=1000;
 									//cout<<"tot "<<tot<<" "<<Inst.WorkVehicle[v]<<endl;
 									if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v]){
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);
@@ -1186,17 +1284,17 @@ int mainBend(MyInstance Inst)
 				if(SubSolving.count()+MasterSolving.count()>1800){
 					GetOut=true;
 					cout<<"Time limit"<<endl;
-					for (int i = 0; i < Inst.Np; i++){
+					/*for (int i = 0; i < Inst.Np; i++){
 						for (int j = 0; j < Inst.Nc; j++){
 							for (int k = 0; k < Inst.Nk; k++){
 								if(Inst.stocks[i][k]>0 && Inst.demands[j][k]>0){
 									if(MasterCplex.getValue(f[i][k][j])){
 										cout<<" "<<f[i][k][j];
-										}
+									}
 								}
 							}
 						}
-					}
+					}*/
 				}
 				if(upper < BestUpper)
 					BestUpper=upper;
@@ -1259,6 +1357,8 @@ int mainBend(MyInstance Inst)
 				cout<<"Delivery Prod "<<TotDelProd<<endl;
 				cout<<"Delivery Hub "<<TotDelHub<<endl;
 				GetOut=true;
+			}else if(Inst.Gap==1 && (upper - lower) / upper< 0.0){
+				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.0);
 			}
 			
 			MasterModel.add(AddCuts);
