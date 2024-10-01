@@ -70,13 +70,11 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			f[i] = IloArray<IloBoolVarArray>(env, Inst.Nk);
 			for (int k = 0; k < Inst.Nk; ++k) {
 				f[i][k] = IloBoolVarArray(env, Inst.Nc);
-				if(Inst.stocks[i][k]>0){
-					for (int c = 0; c < Inst.Nc; ++c) {
-						if(Inst.demands[c][k]>0){
-							ostringstream varName;
-							varName << "f_" << i <<"_"<<k <<"_"<<c;
-							f[i][k][c] = IloBoolVar(env, varName.str().c_str());
-						}
+				for (int c = 0; c < Inst.Nc; ++c) {
+					if(Inst.demands[c][k]>0){
+						ostringstream varName;
+						varName << "f_" << i <<"_"<<k <<"_"<<c;
+						f[i][k][c] = IloBoolVar(env, varName.str().c_str());
 					}
 				}
 			}
@@ -86,19 +84,17 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			fr[i] = IloArray<IloNumVarArray>(env, Inst.Nk);
 			for (int k = 0; k < Inst.Nk; ++k) {
 				fr[i][k] = IloNumVarArray(env, Inst.Nc);
-				if(Inst.stocks[i][k]>0){
-					for (int c = 0; c < Inst.Nc; ++c) {
-						if(Inst.demands[c][k]>0){
-							ostringstream varName;
-							varName << "f_" << i <<"_"<<k <<"_"<<c;
-							fr[i][k][c] = IloNumVar(env, 0.0,1.0,varName.str().c_str());
-						}
+				for (int c = 0; c < Inst.Nc; ++c) {
+					if(Inst.demands[c][k]>0){
+						ostringstream varName;
+						varName << "f_" << i <<"_"<<k <<"_"<<c;
+						fr[i][k][c] = IloNumVar(env, 0.0,1.0,varName.str().c_str());
 					}
 				}
+				
 			}
 		}
 	}
-	
 	for (int t = 0; t < Inst.Nt; ++t) {
 		sigma[t] = IloArray<IloNumVar>(env, Inst.Nv);
 		for (int v = 0; v < Inst.Nv; ++v) {
@@ -134,7 +130,6 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 	objective.end();
 
 	 // Constraints
-
 	 //Clients are served
 	for (int j = 0; j < Inst.Nc; ++j) {
 		for (int k = 0; k < Inst.Nk; ++k) {
@@ -155,8 +150,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 	}
 	// Stocks are valid
 	for (int i = 0; i < Inst.Np; ++i) {
-		for (int k = 0; k < Inst.Nk; ++k) {
-			
+		for (int k = 0; k < Inst.Nk; ++k) {		
 			IloExpr stock_ok(env);
 			for (int j = 0; j < Inst.Nc; ++j) {
 				if(Inst.demands[j][k]>0){
@@ -167,8 +161,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 				}
 			}
 			masterModel.add(Inst.stocks[i][k] >= stock_ok);
-			stock_ok.end();
-			
+			stock_ok.end();		
 		}
 	}
 	//Command leave producers
@@ -479,8 +472,8 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			for (int v = 0; v < Inst.Nv; ++v) {			
 				for (int c =0; c < Inst.Nc; ++c) {
 					for (int k =0; k < Inst.Nk; ++k) {
-						if (Inst.demands[c][k]==0 || !Inst.Client_av[c][t] || Inst.DeliWindowsEar[c][k] -1 > t || Inst.DeliWindowsLat[c][k]-1 < t ) {
-							masterModel.add( w[c][t][v][k][c] == 0);
+						if (Inst.demands[c][k]==0 || !Inst.Client_av[c][t] || Inst.DeliWindowsEar[c][k] - 1 > t || Inst.DeliWindowsLat[c][k] -1 < t ) {
+							masterModel.add( w[Inst.Cmoins[c]][t][v][k][c] == 0);
 						}
 					}
 				}
@@ -491,7 +484,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 				for (int k =0; k < Inst.Nk; ++k) {
 					for (int c =0; c < Inst.Nc; ++c) {
 						for (int h =0; h < Inst.Nh; ++h) {
-							if(Inst.DeliWindowsLat[c][k]-1 < t || Inst.DeliWindowsEar[c][k]-Inst.Experiation_date[k]-1 > t){
+							if(Inst.DeliWindowsLat[c][k] < t || Inst.DeliWindowsEar[c][k]-Inst.Experiation_date[k]-1 > t){
 								masterModel.add( w[Inst.PairHub[h].second][t][v][k][c] == 0);
 							}
 						}
@@ -515,7 +508,18 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 				}
 			}
 		}
-
+		for (int i = 0; i < Inst.Np; ++i) {
+			for (int c = 0; c < Inst.Nc; ++c) {			
+				for (int k =0; k < Inst.Nk; ++k) {
+					if(Inst.stocks[i][k] < Inst.demands[c][k]){
+						if(Inst.FReal==0)
+							masterModel.add( f[i][k][c] == 0);
+						else
+							masterModel.add( fr[i][k][c] == 0);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -962,7 +966,7 @@ int mainBend(MyInstance Inst)
 		MasterCplex.setWarning(env.getNullStream());
 		MasterCplex.setParam(IloCplex::Param::MIP::Display, 0);
 		if(Inst.ToleranceOK==0){
-			MasterCplex.setParam(IloCplex::IloCplex::Param::MIP::Tolerances::Integrality, 1e-5);  // Integer feasibility tolerance
+			MasterCplex.setParam(IloCplex::IloCplex::Param::MIP::Tolerances::Integrality, 1e-9);  // Integer feasibility tolerance
 			MasterCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
 			MasterCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
 		}
@@ -1357,7 +1361,7 @@ int mainBend(MyInstance Inst)
 				cout<<"Delivery Prod "<<TotDelProd<<endl;
 				cout<<"Delivery Hub "<<TotDelHub<<endl;
 				GetOut=true;
-			}else if(Inst.Gap==1 && (upper - lower) / upper< 0.0){
+			}else if(Inst.Gap==1 && (upper - lower) / upper< 0.05){
 				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.0);
 			}
 			
