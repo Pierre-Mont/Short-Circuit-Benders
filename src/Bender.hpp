@@ -1311,6 +1311,10 @@ int mainBend(MyInstance Inst)
 				GetOut=true;
 				std::cerr << "Master Solving failed" << std::endl;
 			}
+			if(Inst.TimeCode==1){
+				ofstream FichierTime(Inst.intputFile, ios::app);
+				FichierTime << iter <<" "<<MasterSolving.count()<<" "<<SubSolving.count()<<endl;
+			}
 			cout<<iter<<" "<<upper<<" "<<lower<< " NbFeas "<<Inst.NbFeasCut<<" NbOpt "<<Inst.NbOptCut<<" "<<"MasterS "<<MasterSolving.count()<<" SubSolving "<<SubSolving.count()<<endl;
 			if((upper - lower) / upper < epsi){
 				cout<<"Terminating with the optimal solution"<<endl;

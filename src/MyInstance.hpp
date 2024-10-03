@@ -17,7 +17,7 @@ float round2d(float var)
 }
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode;
 	vector<float> MinDist;
 	vector<vector<float>> dist;
 	//For Debugging
@@ -27,12 +27,15 @@ class MyInstance{
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
+	string intputFile;
 
-	void fromFile(const std::string& inputFile,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in) {
-        ifstream file(inputFile);
+	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in) {
+        ifstream file(inputFile_in);
 		if (!file.is_open()) {
-			std::cerr << "Error opening file: " << inputFile << std::endl;
+			std::cerr << "Error opening file: " << inputFile_in << std::endl;
 		}
+		intputFile=inputFile_in+".TC.txt";
+
 		int count = 0;
 		string line;
 		NbOptCut=0;
@@ -50,6 +53,7 @@ class MyInstance{
 		NoObj=NoObj_in;
 		ToleranceOK=ToleranceOK_in;
 		Gap=Gap_in;
+		TimeCode=TimeCode_in;
 		NbNodeSubs=0;
 		NbSolvedSubs=0;
 		NbFeasCut=0;
