@@ -1,7 +1,7 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 #include <chrono>
-#include <ilcp/cp.h> 
+
 #include "MyInstance.hpp"
 
 ILOSTLBEGIN
@@ -1316,7 +1316,7 @@ int mainBend(MyInstance Inst)
 				FichierTime << iter <<" "<<MasterSolving.count()<<" "<<SubSolving.count()<<endl;
 			}
 			cout<<iter<<" "<<upper<<" "<<lower<< " NbFeas "<<Inst.NbFeasCut<<" NbOpt "<<Inst.NbOptCut<<" "<<"MasterS "<<MasterSolving.count()<<" SubSolving "<<SubSolving.count()<<endl;
-			if((upper - lower) / upper < epsi){
+			if((upper - lower) / upper < epsi && Inst.Gap==0){
 				cout<<"Terminating with the optimal solution"<<endl;
             	cout<<"Optimal value: "<<lower<<endl;
 				vector<int> Operation_Period(Inst.Nt,0);
@@ -1366,6 +1366,7 @@ int mainBend(MyInstance Inst)
 				cout<<"Delivery Hub "<<TotDelHub<<endl;
 				GetOut=true;
 			}else if(Inst.Gap==1 && (upper - lower) / upper< 0.05){
+				Inst.Gap=0;
 				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.0);
 			}
 			
