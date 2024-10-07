@@ -55,6 +55,10 @@ int main(int argc, char *argv[]) {
 		}
 		if(arg.find("-BC=") == 0) {
 			Bapcod = std::stoi(arg.substr(4));
+			#ifndef USE_BAP
+				cout<<"Error: option -BC requires Bapcod";
+				return 0;
+			#endif
 		}
 		if(arg.find("-FR=") == 0) {
 			FReal = std::stoi(arg.substr(4));

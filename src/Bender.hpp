@@ -1,9 +1,11 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 #include <chrono>
-
-#include "MyInstance.hpp"
-
+#ifdef USE_BAP
+	#include "Bapcod.hpp"
+#else
+	#include "MyInstance.hpp"
+#endif
 ILOSTLBEGIN
 
 
@@ -897,7 +899,7 @@ std::string exec(const char* cmd) {
     pclose(pipe);
     return result;
 }
-float SolveWithBapcod(int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand)
+/*float SolveWithBapcod(int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand)
 {
     std::ofstream outfile("VRPTW/Bap.txt");
     
@@ -937,7 +939,7 @@ float SolveWithBapcod(int maxNbVehicles, int capacity, int MaxWork, int nbCust, 
         assert(opt==-1);
     }
     return opt;
-}
+}*/
 
 
 
@@ -990,8 +992,6 @@ int mainBend(MyInstance Inst)
 		IloConstraintArray AddCuts(env);
 		float lower=0,BestUpper=10000,upper=0,epsi = 1e-5,tot;
 		vector<array<int,3>> VarPick, VarDeli,empt;
-    	MasterCplex.exportModel("filemas.lp");	
-		
 		auto start = std::chrono::high_resolution_clock::now();
 		
 		std::chrono::duration<double> MasterSolving(0.0),SubSolving(0.0);
@@ -1010,10 +1010,11 @@ int mainBend(MyInstance Inst)
 			double value;
 			if (MasterCplex.getStatus() == IloAlgorithm::Optimal){
 				//cout<<lower<< " "<<MasterCplex.getObjValue()<<endl;
-
+				
+				IloNumArray solution(env);
 				//assert(lower <= MasterCplex.getObjValue() + 0.1);
 				lower=MasterCplex.getObjValue(); 
-				IloNumArray solution(env);
+				
 				IloNumVarArray varsMaster(env);       
 					
 				upper=0;
@@ -1157,7 +1158,7 @@ int mainBend(MyInstance Inst)
 										//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<endl;
 										//cout<<NodeSub<<endl;
 										GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-										//WorkerCplex.exportModel("file.sav");
+										
 										WorkerCplex.solve();
 										//cout<<WorkerCplex.getObjValue()<<endl;
 										if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
@@ -1172,23 +1173,27 @@ int mainBend(MyInstance Inst)
 											res[s]=-2;  // Optionally return -1 to indicate failure
 										}
 									}else{
-										vector<int> xCoord,yCoord,demandbap;
-										for (int i = 0; i < (int) NodeSub.size(); i++)
-										{
-											xCoord.push_back(Inst.x_all[NodeSub[i]]);
-											yCoord.push_back(Inst.y_all[NodeSub[i]]);
-											demandbap.push_back(dem[NodeSub[i]]);
-											
-										}
-										assert(demandbap[0]==0);
+										#ifdef USE_BAP
+											vrpstw::Loader loader;
+											BcInitialisation bapcodInit("../config/bc.cfg");
+											vector<int> xCoord,yCoord,demandbap;
+											for (int i = 0; i < (int) NodeSub.size(); i++)
+											{
+												xCoord.push_back(Inst.x_all[NodeSub[i]]);
+												yCoord.push_back(Inst.y_all[NodeSub[i]]);
+												demandbap.push_back(dem[NodeSub[i]]);
+												
+											}
+											assert(demandbap[0]==0);
 
-										res[s]=SolveWithBapcod(Inst.TourVehicle[v],Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap);
-										if(res[s]==-1)
-											upper+=1000;
-										else{
-											upper+=res[s];
-											tot+=res[s];
-										}
+											res[s]=SolveWithBapcod(bapcodInit,loader,Inst.TourVehicle[v],Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap);
+											if(res[s]==-1)
+												upper+=1000;
+											else{
+												upper+=res[s];
+												tot+=res[s];
+											}
+										#endif
 									}
 									
 									auto endMaster = std::chrono::high_resolution_clock::now();
@@ -1204,8 +1209,8 @@ int mainBend(MyInstance Inst)
 													for (int r = 0; r < Inst.TourVehicle[v]; ++r) {
 														value=WorkerCplex.getValue(x[NodeSub[i]][NodeSub[j]][r]);
 														if(value >1-epsi)
-															//cout<<x[NodeSub[i]][NodeSub[j]][r]<<" "<<Inst.dist[NodeSub[i]][NodeSub[j]]<<endl;
-															cout<<x[NodeSub[i]][NodeSub[j]][r]<<"_"<<t<<"_"<<v<<endl;
+															cout<<x[NodeSub[i]][NodeSub[j]][r]<<" "<<Inst.dist[NodeSub[i]][NodeSub[j]]<<endl;
+															//cout<<x[NodeSub[i]][NodeSub[j]][r]<<"_"<<t<<"_"<<v<<endl;
 													}
 												}
 											}
@@ -1313,7 +1318,7 @@ int mainBend(MyInstance Inst)
 			}
 			if(Inst.TimeCode==1){
 				ofstream FichierTime(Inst.intputFile, ios::app);
-				FichierTime << iter <<" "<<MasterSolving.count()<<" "<<SubSolving.count()<<endl;
+				FichierTime << iter <<" ; "<<MasterSolving.count()<<" ; "<<SubSolving.count()<<" ; "<<Inst.NbFeasCut+Inst.NbOptCut<<" ; "<<upper<<" ; "<<lower<<endl;
 			}
 			cout<<iter<<" "<<upper<<" "<<lower<< " NbFeas "<<Inst.NbFeasCut<<" NbOpt "<<Inst.NbOptCut<<" "<<"MasterS "<<MasterSolving.count()<<" SubSolving "<<SubSolving.count()<<endl;
 			if((upper - lower) / upper < epsi && Inst.Gap==0){
@@ -1375,7 +1380,6 @@ int mainBend(MyInstance Inst)
       	}
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> duration = end - start;
-		MasterCplex.exportModel("filemas.lp");	
 
 		cout<<"Total time "<<duration.count()<<endl;
 		cout<<"Iteration "<<iter<<endl;

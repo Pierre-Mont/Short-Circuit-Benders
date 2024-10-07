@@ -12,8 +12,8 @@ float round2d(float var)
     // 3766.66 + .5 =3767.16    for rounding off value
     // then type cast to int so value is 3767
     // then divided by 100 so the value converted into 37.67
-    float value = (int)(var * 1000 + .5);
-    return (float)value / 1000;
+    float value = (int)(var * 100 + .5);
+    return (float)value / 100;
 }
 class MyInstance{
 	public:
@@ -134,9 +134,9 @@ class MyInstance{
 						iss >> re;
 						if(i!=j && MinD>re){
 							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
-								MinD=round2d(re);
+								MinD=re;
 						}
-						dist.back().push_back(round2d(re));
+						dist.back().push_back(re);
 					}
 					MinDist.push_back(MinD);
 				}

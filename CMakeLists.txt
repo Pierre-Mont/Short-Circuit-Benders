@@ -14,6 +14,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
     set(CMAKE_CXX_FLAGS_DEBUG       "${CMAKE_CXX_FLAGS_DEBUG} -save-temps=obj")
 endif()
 
+option(BapCod "Enable the external project" OFF)
+
+if(BapCod)
+    set(Boost_INCLUDE_DIR "/usr/include/boost")
+    set(Boost_LIBRARIES
+    /usr/lib/x86_64-linux-gnu/libboost_program_options.so
+    /usr/lib/x86_64-linux-gnu/libboost_regex.so
+    /usr/lib/x86_64-linux-gnu/libboost_timer.so
+    /usr/lib/x86_64-linux-gnu/libboost_chrono.so
+    /usr/lib/x86_64-linux-gnu/libboost_thread.so
+    /usr/lib/x86_64-linux-gnu/libboost_system.so
+    )
+endif()    
 
 
 find_package(CPLEX)
@@ -34,3 +47,21 @@ find_package(CPLEX REQUIRED)
 target_link_libraries(Bender PRIVATE ${CPLEX_CP_LIBRARY} PRIVATE ${CPLEX_ILOCPLEX_LIBRARY} PRIVATE ${CPLEX_CONCERT_LIBRARY} PRIVATE ${CPLEX_LIBRARY})
 
 target_link_libraries(Bender PRIVATE dl)
+if(BapCod)
+    add_definitions(-DUSE_BAP=true)
+    set(BapCod_PATH "/home/kisouke/bapcod-v0.82.5/")
+    find_package(BcpRcsp)
+    set(USER_LIBRARIES ${BCP_RCSP_LIBRARY})
+    set(USER_INCLUDE_DIR ${BCP_RCSP_INCLUDE_DIR})
+    
+    target_include_directories(Bender PRIVATE ${Boost_INCLUDE_DIR} PRIVATE ${PROJECT_SOURCE_DIR}/include PRIVATE ${BapCod_PATH}/Bapcod/include PRIVATE ${BapCod_PATH}/Bapcod/include_dev PRIVATE ${BapCod_PATH}/Tools/rcsp/include)
+    
+    target_link_libraries(Bender 
+    PRIVATE dl
+    PRIVATE ${PROJECT_SOURCE_DIR}/libs/libVRP_solver.a 
+    PRIVATE ${PROJECT_SOURCE_DIR}/libs/libbapcod_release.a
+    PRIVATE ${Boost_LIBRARIES} 
+    PRIVATE ${PROJECT_SOURCE_DIR}/libs/librcsplinux.a
+    
+)
+endif()
