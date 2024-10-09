@@ -17,16 +17,11 @@ endif()
 option(BapCod "Enable the external project" OFF)
 
 if(BapCod)
-    set(Boost_INCLUDE_DIR "/usr/include/boost")
-    set(Boost_LIBRARIES
-    /usr/lib/x86_64-linux-gnu/libboost_program_options.so
-    /usr/lib/x86_64-linux-gnu/libboost_regex.so
-    /usr/lib/x86_64-linux-gnu/libboost_timer.so
-    /usr/lib/x86_64-linux-gnu/libboost_chrono.so
-    /usr/lib/x86_64-linux-gnu/libboost_thread.so
-    /usr/lib/x86_64-linux-gnu/libboost_system.so
-    )
-endif()    
+  #set(Boost_DEBUG ON)
+  #set(BOOST_ROOT "BOOST_ROOT")
+  find_package(LEMON)
+  find_package(Boost 1.74 REQUIRED COMPONENTS program_options regex system timer chrono thread REQUIRED)
+endif()
 
 
 find_package(CPLEX)
@@ -49,19 +44,23 @@ target_link_libraries(Bender PRIVATE ${CPLEX_CP_LIBRARY} PRIVATE ${CPLEX_ILOCPLE
 target_link_libraries(Bender PRIVATE dl)
 if(BapCod)
     add_definitions(-DUSE_BAP=true)
-    set(BapCod_PATH "/home/kisouke/bapcod-v0.82.5/")
+
     find_package(BcpRcsp)
     set(USER_LIBRARIES ${BCP_RCSP_LIBRARY})
     set(USER_INCLUDE_DIR ${BCP_RCSP_INCLUDE_DIR})
-    
-    target_include_directories(Bender PRIVATE ${Boost_INCLUDE_DIR} PRIVATE ${PROJECT_SOURCE_DIR}/include PRIVATE ${BapCod_PATH}/Bapcod/include PRIVATE ${BapCod_PATH}/Bapcod/include_dev PRIVATE ${BapCod_PATH}/Tools/rcsp/include)
-    
-    target_link_libraries(Bender 
+    message("-- Boost_INCLUDE_DIR: ${Boost_INCLUDE_DIR}")
+    message("-- Boost_LIBRARIES: ${Boost_LIBRARIES}")
+    message("-- BapCodPath: ${BapCod_PATH}")
+    message("-- BapCodInc: ${BapCod_PATH}/Bapcod/include")
+    target_include_directories(Bender PRIVATE ${Boost_INCLUDE_DIR} PRIVATE ${PROJECT_SOURCE_DIR}/include PRIVATE ${BapCod_PATH}/Bapcod/include PRIVATE ${BapCod_PATH}/Bapcod/include_dev PRIVATE ${BapCod_PATH}/Tools/rcsp/include PRIVATE ${LEMON_INCLUDE_DIR})
+
+    target_link_libraries(Bender
     PRIVATE dl
-    PRIVATE ${PROJECT_SOURCE_DIR}/libs/libVRP_solver.a 
+    PRIVATE ${PROJECT_SOURCE_DIR}/libs/libVRP_solver.a
     PRIVATE ${PROJECT_SOURCE_DIR}/libs/libbapcod_release.a
-    PRIVATE ${Boost_LIBRARIES} 
+    PRIVATE ${Boost_LIBRARIES}
+    PRIVATE ${LEMON_LIBRARY}
     PRIVATE ${PROJECT_SOURCE_DIR}/libs/librcsplinux.a
-    
+
 )
 endif()

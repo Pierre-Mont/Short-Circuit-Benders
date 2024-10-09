@@ -967,11 +967,6 @@ int mainBend(MyInstance Inst)
 		MasterCplex.setOut(env.getNullStream());  // Suppress log output
 		MasterCplex.setWarning(env.getNullStream());
 		MasterCplex.setParam(IloCplex::Param::MIP::Display, 0);
-		if(Inst.ToleranceOK==0){
-			MasterCplex.setParam(IloCplex::IloCplex::Param::MIP::Tolerances::Integrality, 1e-9);  // Integer feasibility tolerance
-			MasterCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
-			MasterCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
-		}
 		if(Inst.Gap==1){
 			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.05);
 		}
