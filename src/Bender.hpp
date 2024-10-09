@@ -102,7 +102,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 		for (int v = 0; v < Inst.Nv; ++v) {
 			ostringstream varName;
 			varName << "sig_" << t <<"_"<<v;
-			sigma[t][v] = IloNumVar(env, 0.0, 100,varName.str().c_str());
+			sigma[t][v] = IloNumVar(env, 0.0, Inst.TourVehicle[v]*Inst.CapaVehicle[v],varName.str().c_str());
 		}
 	}
 	// Define the objective function
@@ -969,7 +969,8 @@ int mainBend(MyInstance Inst)
 		MasterCplex.setParam(IloCplex::Param::MIP::Display, 0);
 		if(Inst.Gap==1){
 			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.05);
-		}
+		}else if(Inst.Gap==2)
+			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.10);
 		MasterCplex.setParam(IloCplex::Param::Threads, 1);
 
 		WorkerCplex.setParam(IloCplex::Param::Threads, 1);
@@ -991,8 +992,39 @@ int mainBend(MyInstance Inst)
 		
 		std::chrono::duration<double> MasterSolving(0.0),SubSolving(0.0);
 		cout<<"Solve the Problem"<<endl;
+		IloRange ObjCtr;
+		if(Inst.AddConstraintObj==1){
+			IloExpr expr(env);
+			if(Inst.NoObj==0){
+				for (int i = 0; i < Inst.Np; ++i) {
+					for (int k = 0; k < Inst.Nk; ++k) {
+						if(Inst.stocks[i][k]>0){
+							for (int j = 0; j < Inst.Nc; ++j) {	
+								if(Inst.demands[j][k]>0){
+									if(Inst.FReal==0)
+										expr += Inst.dist[i][j+Inst.Np+Inst.Nh] * f[i][k][j];
+									else
+										expr += Inst.dist[i][j+Inst.Np+Inst.Nh] * fr[i][k][j];
+								}
+							}
+						}
+					}
+				}
+			}
+			for (int t = 0; t < Inst.Nt; ++t) {
+				for (int v = 0; v < Inst.Nv; ++v) {
+					expr += sigma[t][v];
+				}
+			}
+
+			ObjCtr = IloRange(env, expr, 10000, "ObjCtr");
+			MasterModel.add(ObjCtr);
+			expr.end();
+		}
+		bool BestUpperChg=false;
 		// Loop through each Benders iteration
 		while(iter < maxIterations && !GetOut){
+			BestUpperChg=false;
 			// Solve master problem
 			auto startMaster = std::chrono::high_resolution_clock::now();
 			MasterCplex.solve();
@@ -1022,7 +1054,8 @@ int mainBend(MyInstance Inst)
 								else
 									value=MasterCplex.getValue(fr[i][k][j]);
 								if(value>1-epsi){
-									upper+=Inst.dist[i][j+Inst.Np+Inst.Nh];
+									if(Inst.NoObj==0)
+										upper+=Inst.dist[i][j+Inst.Np+Inst.Nh];
 									if(Inst.WarmStart==1){
 										if(Inst.FReal==0)
 											varsMaster.add(f[i][k][j]);
@@ -1271,7 +1304,7 @@ int mainBend(MyInstance Inst)
 										AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,tot,PickAndDel.first,PickAndDel.second,NotUsedPoint,AddCuts);
 									if(Inst.MoreCuts==1)
 										AddMoreOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);
-								}else if(tot>MasterCplex.getValue(sigma[t][v])+epsi){
+								}else if(tot>MasterCplex.getValue(sigma[t][v])+epsi || Inst.TestLogic==1){
 									if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v])
 										AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);
 									else
@@ -1300,8 +1333,10 @@ int mainBend(MyInstance Inst)
 						}
 					}*/
 				}
-				if(upper < BestUpper)
+				if(upper < BestUpper){
+					BestUpperChg=true;
 					BestUpper=upper;
+				}
 				if(Inst.WarmStart==1)
 					MasterCplex.addMIPStart(varsMaster, solution);
 			}else if (MasterCplex.getStatus()  == IloAlgorithm::Infeasible) {
@@ -1319,6 +1354,25 @@ int mainBend(MyInstance Inst)
 			if((upper - lower) / upper < epsi && Inst.Gap==0){
 				cout<<"Terminating with the optimal solution"<<endl;
             	cout<<"Optimal value: "<<lower<<endl;
+				if(Inst.NoObj==1){
+					float newopt=lower;
+					for (int i = 0; i < Inst.Np; i++){
+						for (int j = 0; j < Inst.Nc; j++){
+							for (int k = 0; k < Inst.Nk; k++){
+								if(Inst.stocks[i][k]>0 && Inst.demands[j][k]>0){
+									if(Inst.FReal==0)
+										value=MasterCplex.getValue(f[i][k][j]);
+									else
+										value=MasterCplex.getValue(fr[i][k][j]);
+									if(value>1-epsi){
+										newopt+=Inst.dist[i][j+Inst.Np+Inst.Nh];
+									}
+								}
+							}
+						}
+					}
+					cout<<"True Optimal:"<<newopt<<endl;
+				}
 				vector<int> Operation_Period(Inst.Nt,0);
 				vector<int> Operation_Prod(Inst.Np,0);
 				vector<int> Operation_Hub(Inst.Nh,0);
@@ -1368,9 +1422,18 @@ int mainBend(MyInstance Inst)
 			}else if(Inst.Gap==1 && (upper - lower) / upper< 0.05){
 				Inst.Gap=0;
 				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.0);
+			}else if(Inst.Gap==2 && (upper - lower) / upper< 0.10){
+				Inst.Gap=1;
+				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, 0.05);
 			}
 			
 			MasterModel.add(AddCuts);
+			if(Inst.AddConstraintObj==1 && BestUpperChg){
+				MasterModel.remove(ObjCtr);
+				ObjCtr.setUB(upper+0.1);
+				MasterModel.add(ObjCtr);
+				MasterCplex.exportModel("filemas2.lp");
+			}
 			iter+=1;
       	}
 		auto end = std::chrono::high_resolution_clock::now();
