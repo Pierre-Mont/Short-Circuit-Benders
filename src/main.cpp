@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
 	int TimeCode=0;
 	int AddConstraintObj=0;
 	int TestLogic=0;
+	int SigmaUb=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -82,6 +83,9 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-TL=") == 0) {
 			TestLogic = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-SU=") == 0) {
+			TestLogic = std::stoi(arg.substr(4));
+		}
     }
 	// Initialize data containers
 	// Read the file
@@ -92,7 +96,7 @@ int main(int argc, char *argv[]) {
 	}
 	MyInstance Inst;
 	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic);
+	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb);
 	
 	// Model the problem
 	

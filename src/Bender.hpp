@@ -102,8 +102,11 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 		for (int v = 0; v < Inst.Nv; ++v) {
 			ostringstream varName;
 			varName << "sig_" << t <<"_"<<v;
-			sigma[t][v] = IloNumVar(env, 0.0, Inst.TourVehicle[v]*Inst.CapaVehicle[v],varName.str().c_str());
-		}
+			if(Inst.SigmaUb==1)
+				sigma[t][v] = IloNumVar(env, 0.0, Inst.TourVehicle[v]*Inst.CapaVehicle[v],varName.str().c_str());
+			else
+				sigma[t][v] = IloNumVar(env, 0.0, 100,varName.str().c_str());
+		}		
 	}
 	// Define the objective function
 	IloExpr objective(env);
