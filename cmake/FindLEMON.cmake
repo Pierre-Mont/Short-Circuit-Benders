@@ -3,7 +3,7 @@ if("${LEMON_INCLUDE_DIR}" STREQUAL "" OR "${LEMON_INCLUDE_DIR}" STREQUAL "LEMON_
   # Set possible paths to include
   find_path(LEMON_INCLUDE_DIR
     lemon/list_graph.h
-    PATHS $ENV{BAPCOD_ROOT}/BaPCod/Tools/lemon-1.3.1/build/include/
+    PATHS $ENV{BAPCOD_ROOT}/Tools/lemon-1.3.1/build/include/
     PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../Tools/lemon-1.3.1/build/include/"
     PATHS "/opt/cluster/plafrim-dev/lemon/1.2.3/include/"
     PATHS "$ENV{LEMON_ROOT}/include/"
@@ -21,7 +21,7 @@ if("${LEMON_INCLUDE_DIR}" STREQUAL "" OR "${LEMON_INCLUDE_DIR}" STREQUAL "LEMON_
   else()
       find_library(LEMON_LIBRARY
         libemon.a
-        PATHS $ENV{BAPCOD_ROOT}/BaPCod/Tools/lemon-1.3.1/build/lib/
+        PATHS $ENV{BAPCOD_ROOT}/Tools/lemon-1.3.1/build/lib/
         PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../Tools/lemon-1.3.1/build/lib/"
         PATHS "/opt/cluster/plafrim-dev/lemon/1.2.3/lib/")
   endif()

@@ -18,8 +18,8 @@ float round2d(float var)
 class MyInstance{
 	public:
 	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb;
-	vector<float> MinDist;
-	vector<vector<float>> dist;
+	vector<int> MinDist;
+	vector<vector<int>> dist;
 	//For Debugging
 	vector<int> x_all, y_all; // x_c, y_c, x_p, y_p, x_h, y_h;
 	vector<int>  Experiation_date, Psize,  Pplus ,Cmoins, StartVehicle, CapaVehicle, WorkVehicle, TourVehicle;
@@ -139,9 +139,9 @@ class MyInstance{
 							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
 								MinD=re;
 						}
-						dist.back().push_back(re);
+						dist.back().push_back(int(re));
 					}
-					MinDist.push_back(MinD);
+					MinDist.push_back(int(MinD));
 				}
 			}else if(count == 8){
 				int re;

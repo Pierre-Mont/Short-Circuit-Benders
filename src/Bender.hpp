@@ -1,6 +1,8 @@
 #include <ilcplex/ilocplex.h>
 #include <string>
 #include <chrono>
+#include <numeric>
+
 #ifdef USE_BAP
 	#include "Bapcod.hpp"
 #else
@@ -103,7 +105,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			ostringstream varName;
 			varName << "sig_" << t <<"_"<<v;
 			if(Inst.SigmaUb==1)
-				sigma[t][v] = IloNumVar(env, 0.0, Inst.TourVehicle[v]*Inst.CapaVehicle[v],varName.str().c_str());
+				sigma[t][v] = IloNumVar(env, 0.0, Inst.TourVehicle[v]*Inst.WorkVehicle[v],varName.str().c_str());
 			else
 				sigma[t][v] = IloNumVar(env, 0.0, 100,varName.str().c_str());
 		}		
@@ -126,6 +128,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 			}
 		}
 	}
+
 	for (int t = 0; t < Inst.Nt; ++t) {
 		for (int v = 0; v < Inst.Nv; ++v) {
 			objective += sigma[t][v];
@@ -455,23 +458,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 		}
 		
 	}
-	if(Inst.CapH==1){
-		for (int t = 0; t < Inst.Nt; t++){
-			for (int v = 0; v < Inst.Nv; v++){
-				for (int i = 0; i < Inst.Np; i++){
-					IloExpr expr(env);
-					for (int k = 0; k < Inst.Nk; ++k) {
-						for (int c = 0; c < Inst.Nc; ++c) {
-							expr += w[i][t][v][k][c] * Inst.demands[c][k] * Inst.Psize[k];
-						}
-					}
-					masterModel.add(expr <= Inst.CapaVehicle[v]);
-					expr.end();
-				}
-				
-			}
-		}
-	}
+	
 	if(Inst.MoreZero==1){
 		for (int t = 0; t < Inst.Nt; ++t) {
 			for (int v = 0; v < Inst.Nv; ++v) {			
@@ -639,25 +626,25 @@ void GenWorkerModel(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray
 void AddFeasCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>> w, vector<array<int,3>> Var,vector<array<int,3>> Var2, IloConstraintArray& Addcuts){
 	
 	
-	IloExpr expr(env);
-	for (int t = 0; t < Inst.Nt; t++){
-		if(currnode >= Inst.Np || Inst.Prod_av[currnode][t]){
-			for (int v = 0; v < Inst.Nv; v++){
-				if(Inst.StartVehicle[v]==currnode){
-					expr.clear();
-					for (int i = 0; i < (int)Var.size(); ++i) {
-						expr += w[Var[i][0]][t][v][Var[i][1]][Var[i][2]];  // Build an expression with the variables in OneVal
+		IloExpr expr(env);
+		for (int t = 0; t < Inst.Nt; t++){
+			if(currnode >= Inst.Np || Inst.Prod_av[currnode][t]){
+				for (int v = 0; v < Inst.Nv; v++){
+					if(Inst.StartVehicle[v]==currnode){
+						expr.clear();
+						for (int i = 0; i < (int)Var.size(); ++i) {
+							expr += w[Var[i][0]][t][v][Var[i][1]][Var[i][2]];  // Build an expression with the variables in OneVal
+						}
+						for (int i = 0; i < (int)Var2.size(); ++i) {
+							expr += w[Var2[i][0]][t][v][Var2[i][1]][Var2[i][2]];  // Build an expression with the variables in OneVal
+						}
+						Inst.NbFeasCut++;
+						Addcuts.add(expr <=  (int)(Var2.size()+Var.size()-1));  // Add a constraint using OneVal
 					}
-					for (int i = 0; i < (int)Var2.size(); ++i) {
-						expr += w[Var2[i][0]][t][v][Var2[i][1]][Var2[i][2]];  // Build an expression with the variables in OneVal
-					}
-					Inst.NbFeasCut++;
-					Addcuts.add(expr <=  (int)(Var2.size()+Var.size()-1));  // Add a constraint using OneVal
 				}
 			}
 		}
-	}
-	expr.end();
+		expr.end();
 }
 
 void ImprovedAddFeasCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<IloBoolVarArray>>& y, vector<int> Var,vector<int> Var2, IloConstraintArray& Addcuts){
@@ -718,52 +705,11 @@ void AddOptCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<Il
 			}
 		}
 	}
+	
 	expr.end();
 }
 
-void AddImprovedHubOptCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>> w, IloArray<IloArray<IloBoolVarArray>> y, IloArray<IloArray<IloNumVar>>& sigma, float Opt, vector<array<int,3>> Var, vector<array<int,3>> Var2,vector<int> VarNotIn, IloConstraintArray& Addcuts){
-	IloExpr expr(env);
-	float init;
-	cout<<"OPT is "<<Opt<<endl;
-	for (int i = 0; i < (int) Var.size(); i++)
-	{
-		cout<<Var[i][0]<<" "<<Var[i][1]<<" "<<Var[i][2]<<" "<<endl;
-	}
-	cout<<"VARDELI"<<endl;
-	for (int i = 0; i < (int) Var2.size(); i++)
-	{
-		cout<<Var2[i][0]<<" "<<Var2[i][1]<<" "<<Var2[i][2]<<" "<<endl;
-	}
-	cout<<endl;
-	cout<<" ADD OPT CUT"<<endl;
-	for (int t = 0; t < Inst.Nt; t++){
-		//Add a cut only if the current node is a hub or an available producer.
-		if(currnode >= Inst.Np || Inst.Prod_av[currnode][t]){
-			for (int v = 0; v < Inst.Nv; v++){
-				if(Inst.StartVehicle[v]==currnode){
-					expr.clear();
-					init=Opt;
-					for (int i = 0; i < (int)Var.size(); ++i) {
-						init-=2*Inst.dist[currnode][Var[i][0]];
-						expr +=  w[Var[i][0]][t][v][Var[i][1]][Var[i][2]] * 2 *Inst.dist[currnode][Var[i][0]];  // Build an expression with the variables in OneVal
-					}
-					for (int i = 0; i < (int)Var2.size(); ++i) {
-						expr += w[Var2[i][0]][t][v][Var2[i][1]][Var2[i][2]] * 2 *Inst.dist[currnode][Var2[i][0]]; // Build an expression with the variables in OneVal
-						init-=2*Inst.dist[currnode][Var2[i][0]];
-					}
 
-					for (int i = 0; i < (int)VarNotIn.size(); ++i) {
-						expr += y[VarNotIn[i]][t][v] *Inst.MinDist[VarNotIn[i]]; // Build an expression with the variables in OneVal
-					}
-					Inst.NbOptCut++;
-					cout<<expr<<endl;
-					Addcuts.add(init + expr <= sigma[t][v]);  // Add a constraint using OneVal
-				}
-			}
-		}
-	}
-	expr.end();
-}
 void AddImprovedProdOptCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<IloBoolVarArray>> y,  IloArray<IloArray<IloNumVar>> sigma, float Opt, vector<int> Var,vector<int> Var2, vector<int> VarNotIn, IloConstraintArray& Addcuts){
 	IloExpr expr(env);
 	float init;
@@ -983,13 +929,13 @@ int mainBend(MyInstance Inst)
 		WorkerCplex.setParam(IloCplex::Param::Simplex::Tolerances::Optimality, 1e-9);  // Optimality tolerance
 		WorkerCplex.setParam(IloCplex::Param::Feasopt::Tolerance, 1e-9);
 		WorkerCplex.setWarning(env.getNullStream());
-		int maxIterations=1000,iter=0;
+		int maxIterations=100000,iter=0;
 		pair<int,int> TotalDem;
 		bool AlreadyAdded, GetOut=false;
 		vector<int> NodeSub,dem, NotUsedPoint;
 		pair<vector<int>,vector<int>> PickAndDel,DemandPickAndDel(vector<int>(Inst.node,0),vector<int>(Inst.node,0));
 		IloConstraintArray AddCuts(env);
-		float lower=0,BestUpper=10000,upper=0,epsi = 1e-5,tot;
+		float lower=0,BestUpper=100000,upper=0,epsi = 1e-5,tot;
 		vector<array<int,3>> VarPick, VarDeli,empt;
 		auto start = std::chrono::high_resolution_clock::now();
 		
@@ -1020,7 +966,7 @@ int mainBend(MyInstance Inst)
 				}
 			}
 
-			ObjCtr = IloRange(env, expr, 10000, "ObjCtr");
+			ObjCtr = IloRange(env, expr, 100000, "ObjCtr");
 			MasterModel.add(ObjCtr);
 			expr.end();
 		}
@@ -1159,6 +1105,7 @@ int mainBend(MyInstance Inst)
 							vector<float> res;
 							res.push_back(0);
 							res.push_back(0);
+							int UsedTour;
 							for (int s = 0; s < 2; s++){
 								if(s==1){
 									NodeSub=PickAndDel.first;
@@ -1167,6 +1114,7 @@ int mainBend(MyInstance Inst)
 								else{
 									NodeSub=PickAndDel.second;
 									dem=DemandPickAndDel.second;
+									UsedTour=0;
 								}
 								if(NodeSub.size()>1){
 									Inst.NbNodeSubs+=NodeSub.size();
@@ -1186,19 +1134,23 @@ int mainBend(MyInstance Inst)
 
 									auto startMaster = std::chrono::high_resolution_clock::now();
 									if(Inst.Bapcod==0 || NodeSub.size()<=3){
-										//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<endl;
+										//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<" "<<Inst.WorkVehicle[v]<<endl;
 										//cout<<NodeSub<<endl;
 										GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, Inst.TourVehicle[v],Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
 										
 										WorkerCplex.solve();
-										//cout<<WorkerCplex.getObjValue()<<endl;
+										
 										if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
+											//cout<<WorkerCplex.getObjValue()<<endl;
 											res[s]=WorkerCplex.getObjValue();
 											upper+=res[s];
-											tot+=res[s];	
+											tot+=res[s];
+											UsedTour+=accumulate(dem.begin(), dem.end(), 0)/Inst.CapaVehicle[v];
+											if(accumulate(dem.begin(), dem.end(), 0) % Inst.CapaVehicle[v]!=0)
+												UsedTour++;
 										}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
 											res[s]=-1;
-											upper+=1000;
+											upper+=10000;
 										}else {  // For all other cases
 											std::cerr << "Subproblem Solving failed" << std::endl;
 											res[s]=-2;  // Optionally return -1 to indicate failure
@@ -1219,7 +1171,7 @@ int mainBend(MyInstance Inst)
 
 											res[s]=SolveWithBapcod(bapcodInit,loader,Inst.TourVehicle[v],Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap);
 											if(res[s]==-1)
-												upper+=1000;
+												upper+=10000;
 											else{
 												upper+=res[s];
 												tot+=res[s];
@@ -1289,10 +1241,19 @@ int mainBend(MyInstance Inst)
 								}
 							}
 							//cout<<tot<<" "<<epsi<<" "<<Inst.WorkVehicle[v]<<endl;
-							if(tot>epsi){
+							if(UsedTour>Inst.TourVehicle[v]){
+								if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v]){
+										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);
+									}else
+										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts);
+									if(Inst.MoreCuts==1)
+											AddMoreFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);											
+									upper+=10000;
+							}
+							else if(tot>epsi){
 								//cout<<MasterCplex.getValue(sigma[t][v]) <<" "<<tot<<endl;
 								if(tot>Inst.WorkVehicle[v]){
-									upper+=1000;
+									upper+=10000;
 									//cout<<"tot "<<tot<<" "<<Inst.WorkVehicle[v]<<endl;
 									if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v]){
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);
@@ -1300,7 +1261,6 @@ int mainBend(MyInstance Inst)
 										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts);
 									if(Inst.MoreCuts==1)
 											AddMoreFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);											
-									upper+=1000;
 									if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v])
 										AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);
 									else
@@ -1374,7 +1334,7 @@ int mainBend(MyInstance Inst)
 							}
 						}
 					}
-					cout<<"True Optimal:"<<newopt<<endl;
+					cout<<"True Optimal: "<<newopt<<endl;
 				}
 				vector<int> Operation_Period(Inst.Nt,0);
 				vector<int> Operation_Prod(Inst.Np,0);
@@ -1435,7 +1395,6 @@ int mainBend(MyInstance Inst)
 				MasterModel.remove(ObjCtr);
 				ObjCtr.setUB(upper+0.1);
 				MasterModel.add(ObjCtr);
-				MasterCplex.exportModel("filemas2.lp");
 			}
 			iter+=1;
       	}

@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 			TestLogic = std::stoi(arg.substr(4));
 		}
 		if(arg.find("-SU=") == 0) {
-			TestLogic = std::stoi(arg.substr(4));
+			SigmaUb = std::stoi(arg.substr(4));
 		}
     }
 	// Initialize data containers

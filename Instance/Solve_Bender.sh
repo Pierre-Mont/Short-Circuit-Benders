@@ -24,6 +24,7 @@
                                       /Upper/ {upper=$NF}
                                         /Lower/ {lower=$NF}
                                             /Total time/ {total_time=$NF}
+                                            /True Optimal/ {tropt=$NF}
                                               /Master Solving/ {time_masters=$NF}
                                                 /Sub Solving/ {time_subs=$NF}
                                                       /NbFeas/{NbFeas=$NF}
@@ -36,5 +37,5 @@
                                                             /Delivery Prod/ {DP=$NF}
                                                             /Delivery Hub/ {DH=$NF}
                                                               END {
-                                                                  print ";" Status ";" iteration ";" upper " ;" lower " ;" total_time ";" time_masters " ; " time_subs " ;" NbFeas ";" NbOpt ";" AVN ";" MinN ";" MaxN ";" DP ";" DH} ' >> Sol$options_with_underscore.csv
+                                                                   print ";" Status ";" iteration ";" upper " ;" lower " ;" total_time ";" time_masters " ; " time_subs " ;" NbFeas ";" NbOpt ";" AVN ";" MinN ";" MaxN ";" DP ";" DH ";" tropt} ' >> Sol$options_with_underscore.csv
                                                           done
