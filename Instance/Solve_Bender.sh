@@ -37,5 +37,5 @@
                                                             /Delivery Prod/ {DP=$NF}
                                                             /Delivery Hub/ {DH=$NF}
                                                               END {
-                                                                   print ";" Status ";" iteration ";" upper " ;" lower " ;" total_time ";" time_masters " ; " time_subs " ;" NbFeas ";" NbOpt ";" AVN ";" MinN ";" MaxN ";" DP ";" DH ";" tropt} ' >> Sol$options_with_underscore.csv
+                                                                   print ";"Status";"iteration";"upper";"lower";"total_time";"time_masters";"time_subs";"NbFeas";"NbOpt";"AVN";"MinN";"MaxN";"DP";"DH";"tropt} ' >> Sol$options_with_underscore.csv
                                                           done

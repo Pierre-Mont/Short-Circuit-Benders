@@ -175,6 +175,21 @@ while(test && ite<maxite)
     global nbcommand=0
     totaldemand=zeros(Nk)
     maxdemand=zeros(Nk)
+
+    for i in 1:Nc
+        for j in 1:Nk
+            atleast1=false
+            while(!atleast1)
+                randnb=rand(0:100)
+                if(randnb>=50)
+                    demands[i,j]=rand(1:MaxDemand)
+                    atleast1=true
+                else
+                    demands[i,j]=0
+                end
+            end
+        end
+    end
     for i in 1:Nc
         atleast1=0
         for j in 1:Nk
