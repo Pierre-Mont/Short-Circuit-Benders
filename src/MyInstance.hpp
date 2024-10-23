@@ -17,7 +17,7 @@ float round2d(float var)
 }
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
@@ -29,7 +29,7 @@ class MyInstance{
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
 	string intputFile;
 
-	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in) {
+	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int Toofar_in) {
         ifstream file(inputFile_in);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile_in << std::endl;
@@ -63,6 +63,8 @@ class MyInstance{
 		TestLogic=TestLogic_in;
 		SigmaUb=SigmaUb_in;
 		ColdStart=ColdStart_in;
+		Toofar=Toofar_in;
+		int totaldemand=0;
         while (getline(file, line)) {
 			istringstream iss(line);
 			if (count == 0) {
@@ -141,9 +143,9 @@ class MyInstance{
 							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
 								MinD=re;
 						}
-						dist.back().push_back(int(re));
+						dist.back().push_back(int(ceil(re)));
 					}
-					MinDist.push_back(int(MinD));
+					MinDist.push_back(int(ceil(MinD)));
 				}
 			}else if(count == 8){
 				int re;
@@ -151,6 +153,13 @@ class MyInstance{
 				{
 					iss >> re;
 					Psize.push_back(re);	
+				}
+
+				for (int i = 0; i < Nc; i++)
+				{
+					for (int j = 0; j < Nk; j++){
+						totaldemand+=demands[i][j]*Psize[j];
+					}
 				}
 			}else if(count == 9){
 				int re;
@@ -177,6 +186,7 @@ class MyInstance{
 		}
 		
 		int numvehi=Np;
+		TourHub=ceil(totaldemand/(double)CapaHub);
 		for (int i = 0; i < Nh; i++){
 			Vehicles.push_back({});
 			Pplus.push_back(i+Np);
