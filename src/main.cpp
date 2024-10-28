@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
 	int MoreZero=0;
 	int TimeCode=0;
 	int AddConstraintObj=0;
+	int AddObjLower=0;
 	int TestLogic=0;
 	int SigmaUb=0;
 	int LessCut=0;
@@ -84,6 +85,9 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-ACO=") == 0) {
 			AddConstraintObj = std::stoi(arg.substr(5));
 		}
+		if(arg.find("-ACL=") == 0) {
+			AddObjLower = std::stoi(arg.substr(5));
+		}
 		if(arg.find("-TL=") == 0) {
 			TestLogic = std::stoi(arg.substr(4));
 		}
@@ -112,7 +116,7 @@ int main(int argc, char *argv[]) {
 	}
 	MyInstance Inst;
 	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol);
+	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower);
 	
 	// Model the problem
 	

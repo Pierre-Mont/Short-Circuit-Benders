@@ -12,7 +12,7 @@
         done
         # Change to the directory containing the .lp files (if not already in the correct directory)
         cd "$directory" || { echo "Failed to change directory to $directory"; exit 1; }
-        echo ";Status;Iteration;Upper;Lower;Total time;Time to solve Masters;Time to solve Subs;Nb Feas cut; Nb Opt cut ; Average nodes in subs; Min nodes in subs; Max nodes in subs; Delivery Prod; Delivery Hub" >> Sol$options_with_underscore.csv
+        echo ";Status;Iteration;Upper;Lower;Total time;Time to solve Masters;Time to solve Subs;Initial LB;Nb Feas cut; Nb Opt cut ; Average nodes in subs; Min nodes in subs; Max nodes in subs; Delivery Prod; Delivery Hub" >> Sol$options_with_underscore.csv
         # Loop over each .lp file in the current directory
         for inst in *.data; do
                     echo "Solving $inst"
@@ -36,6 +36,7 @@
                                                             /Average Node Subs/ {AVN=$NF}
                                                             /Delivery Prod/ {DP=$NF}
                                                             /Delivery Hub/ {DH=$NF}
+                                                            /Initial LB/ {ILB=$NF}
                                                               END {
-                                                                   print ";"Status";"iteration";"upper";"lower";"total_time";"time_masters";"time_subs";"NbFeas";"NbOpt";"AVN";"MinN";"MaxN";"DP";"DH";"tropt} ' >> Sol$options_with_underscore.csv
+                                                                   print ";"Status";"iteration";"upper";"lower";"ILB";"total_time";"time_masters";"time_subs";"NbFeas";"NbOpt";"AVN";"MinN";"MaxN";"DP";"DH";"tropt} ' >> Sol$options_with_underscore.csv
                                                           done
