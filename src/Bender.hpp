@@ -1063,6 +1063,9 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 				vector<float> res;
 				res.push_back(0);
 				res.push_back(0);
+				vector<float> resV2;
+				resV2.push_back(-2);
+				resV2.push_back(-2);
 				bool CapUnf;
 				for (int s = 0; s < 2; s++){
 					CapUnf=false;
@@ -1115,12 +1118,12 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						if(Inst.Bapcod==0 || NodeSub.size()<=3){
 							//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<" "<<Inst.WorkVehicle[v]<<endl;
 							//cout<<NodeSub<<endl;
+							
 							GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
 							
 							WorkerCplex.solve();
 							
 							if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
-								//cout<<WorkerCplex.getObjValue()<<endl;
 								res[s]=WorkerCplex.getObjValue();
 								if(sol==-1){
 									//cout<<"upper + "<<res[s]<<endl;
@@ -1131,7 +1134,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								res[s]=-1;
 								if(sol==-1)
 									upper+=10000;
-								//cout<<"UNF "<<endl;
 							}else {  // For all other cases
 								std::cerr << "Subproblem Solving failed" << std::endl;
 								res[s]=-2;  // Optionally return -1 to indicate failure
@@ -1221,6 +1223,41 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								}
 							}
 						}
+						if(tour> 1  && Inst.AddImprove==1){
+							IloConstraintArray cons(WorkerModel.getEnv());
+							for (IloModel::Iterator it(WorkerModel); it.ok(); ++it) {
+								if ( (*it).isConstraint() )
+									cons.add((*it).asConstraint());
+								}
+							WorkerModel.remove(cons);
+							cons.endElements();
+							cons.end();
+							vector<int> dem2;
+							for (size_t i = 0; i < dem.size(); i++)
+							{
+								dem2.push_back(1);
+							}
+							GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem2, 1,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
+							WorkerCplex.solve();
+							
+							if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
+								//cout<<WorkerCplex.getObjValue()<<endl;
+								resV2[s]=WorkerCplex.getObjValue();
+								if(s==1){
+									AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,resV2[s],PickAndDel.first,{},AddCuts,t,yr);
+								}else{
+									AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,resV2[s],PickAndDel.second,{},AddCuts,t,yr);
+								}
+							}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
+								resV2[s]=-1;
+								if(s==1){
+									ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,{},AddCuts,t,yr);
+								}else{
+									ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.second,{},AddCuts,t,yr);
+								}
+								resV2[s]=0;
+							}
+						}
 					}
 				}
 				//cout<<tot<<" "<<epsi<<" "<<Inst.WorkVehicle[v]<<endl;
@@ -1232,16 +1269,15 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						//cout<<"tot "<<tot<<" "<<Inst.WorkVehicle[v]<<endl;
 						if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v]){
 							AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts,t);
-						}else
-							ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
-						if(Inst.MoreCuts==1)
-								AddMoreFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);											
-						if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v])
 							AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts,t);
-						else
+						}else{
+							ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
 							AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,tot,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
-						if(Inst.MoreCuts==1)
+						}
+						if(Inst.MoreCuts==1){
+							AddMoreFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts);											
 							AddMoreOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);
+						}
 					}else if((sol==-1 && tot>MasterCplex.getValue(sigma[t][v])+epsi) || (sol!=-1 && tot>MasterCplex.getValue(sigma[t][v],sol)+epsi) || Inst.TestLogic==1){
 						if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v])
 							AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts,t);
@@ -1249,6 +1285,16 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 							AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,tot,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
 						if(Inst.MoreCuts==1)
 							AddMoreOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);						
+					}
+					if(Inst.AddImprove==1 && (resV2[0]!=-2 || resV2[1]!=-2)){
+						assert(resV2[0]+resV2[1]<=tot);
+						if(resV2[0]+resV2[1]>Inst.WorkVehicle[v]){
+							ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
+							AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,resV2[0]+resV2[1],PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
+						}else if(resV2[0]+resV2[1]>MasterCplex.getValue(sigma[t][v])+epsi){
+							AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,resV2[0]+resV2[1],PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
+						}
+
 					}
 				}
 			}
@@ -1581,7 +1627,7 @@ int mainBend(MyInstance Inst)
 				IloNumArray solution(env);
 				//assert(lower <= MasterCplex.getObjValue() + 0.1);
 				if(MasterCplex.getBestObjValue()> lower){
-					lower=MasterCplex.getBestObjValue();
+					lower=ceil(MasterCplex.getBestObjValue());
 					BestLowerChg=true;
 				}
 				

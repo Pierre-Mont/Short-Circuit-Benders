@@ -36,6 +36,7 @@ int main(int argc, char *argv[]) {
 	int ColdStart=0;
 	int Toofar=0;
 	int MoreSol=1;
+	int AddImprove=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -106,6 +107,9 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-MS=") == 0) {
 			MoreSol = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-AI=") == 0) {
+			AddImprove = std::stoi(arg.substr(4));
+		}
     }
 	// Initialize data containers
 	// Read the file
@@ -116,7 +120,7 @@ int main(int argc, char *argv[]) {
 	}
 	MyInstance Inst;
 	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower);
+	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove);
 	
 	// Model the problem
 	
