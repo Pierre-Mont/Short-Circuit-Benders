@@ -18,7 +18,8 @@ generate_instances() {
     local in3=$4
     local in4=$5
     local in5=$6
-
+    mkdir LargeV2_${in1}P_${in2}C_${in3}H_${in4}PP_${in5}Co_${in6}
+    cd LargeV2_${in1}P_${in2}C_${in3}H_${in4}PP_${in5}Co_${in6}
     i=1
     seed=1
     while [ $i -le $num ]; do
@@ -27,7 +28,7 @@ generate_instances() {
         echo "Generating instance $i with inputs $in1 and $in2"
         
         # Create the content of the file
-        line="## Seed NbPériode MaxCoordonnée ProduitParProducteur MaxSize\n$seed 5 100 $in4 15\n## NbProd Capacité-Véhicule-Prod Working-Hour-Prod ProdConcu\n$in1 70 120 $in5\n## NbClient MaxQuantité_Prod\n$in2 3\n## NbHub NbVéhicule Capacité Wroking-Hour TourHub\n$in3 2 140 200 3 2"
+        line="## Seed NbPériode MaxCoordonnée ProduitParProducteur MaxSize\n$seed 5 100 $in4 15\n## NbProd Capacité-Véhicule-Prod Working-Hour-Prod ProdConcu\n$in1 70 120 $in5\n## NbClient MaxQuantité_Prod\n$in2 5\n## NbHub NbVéhicule Capacité Wroking-Hour TourHub\n$in3 3 140 200 3 2"
         
         # Write the content to the file
         echo -e "$line" > "$filePath"

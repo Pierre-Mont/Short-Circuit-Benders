@@ -70,6 +70,25 @@ using Dates
 
 # To ensure reproducibility, we set the random number seed:
 
+
+
+function intersection(int1, int2)
+    a′ = max(int1[1], int2[1])
+    b′ = min(int1[2], int2[2])
+    if a′ <= b′
+        return (a′, b′)  # Intersection exists
+    else
+        return nothing  # No intersection
+    end
+end
+
+# Function to compute union (assuming intervals overlap)
+function union(int1, int2)
+    a′′ = min(int1[1], int2[1])
+    b′′ = max(int1[2], int2[2])
+    return (a′′, b′′)
+end
+
 start_time = now()
 
 
@@ -135,9 +154,12 @@ else
     Nh, Nvh, CapaHub, WorkHub, TourHub= values4
     Random.seed!(se)
     close(file)
-    WorkProd=ceil(Int,52.86*ceil((Nh+Nc)/2))
-    WorkHub=ceil(Int,52.86*ceil((Nh+Nc+Np)/2))
+    #WorkProd=ceil(Int,52.86*ceil((Nh+Nc)/2))
+    WorkProd=250
+    #WorkHub=ceil(Int,52.86*ceil((Nh+Nc+Np)))
+    WorkHub=500
     Nk=floor(Int,Np*ProduitParProducteur/ProdConcu)
+    
     # Assign the values to variables
     #a, b, c, d, e = values1
     #x, y, z, w = values2
@@ -154,7 +176,7 @@ x_p, y_p = rand(Np), rand(Np)
 
 ## Hub' potential locations
 x_h, y_h = rand(Nh), rand(Nh)
-maxite=100000
+maxite=10000
 ite=1 
 
 
@@ -175,11 +197,11 @@ while(test && ite<maxite)
     global nbcommand=0
     totaldemand=zeros(Nk)
     maxdemand=zeros(Nk)
-
+    global weighperCust=zeros(Int,Nc)
     for i in 1:Nc
-        for j in 1:Nk
-            atleast1=false
-            while(!atleast1)
+        atleast1=false
+        while(!atleast1)
+            for j in 1:Nk
                 randnb=rand(0:100)
                 if(randnb>=50)
                     demands[i,j]=rand(1:MaxDemand)
@@ -195,10 +217,17 @@ while(test && ite<maxite)
         for j in 1:Nk
             if(demands[i,j]>0)
                 DeliWindows[i,j,1]=rand(1:Nt)
-                DeliWindows[i,j,2]=rand(DeliWindows[i,j,1]:Nt)
+                #DeliWindows[i,j,2]=rand(DeliWindows[i,j,1]+1:Nt)
+                randnumber=rand(1:100)
+                if(randnumber<=10 ||  DeliWindows[i,j,1]==Nt)
+                    DeliWindows[i,j,2]=DeliWindows[i,j,1]
+                else
+                    DeliWindows[i,j,2]=rand(DeliWindows[i,j,1]+1:Nt)
+                end
                 atleast1=1
                 nbcommand=nbcommand+1
                 Totalweight=Totalweight+Psize[j]*demands[i,j]
+                weighperCust[i]+=demands[i,j]*Psize[j]
             end
             if(demands[i,j]>maxdemand[j])
                 maxdemand[j]=demands[i,j]
@@ -227,25 +256,29 @@ while(test && ite<maxite)
     end
     global ite+=1
 end
+
 ite=0
 dist2 = zeros(node, node)
-atleast1C=zeros(Nc)
 test=true
 averageweight=Totalweight/nbcommand
-CapaProd=ceil(Int,averageweight*ceil((Nh+Nc)/2))
-CapaHub=ceil(Int,averageweight*ceil((Nh+Nc+Np)/2))
+averageweightCust=sum(weighperCust)/Nc
+println(averageweight)
+CapaHub=ceil(Int,averageweightCust*ceil((Nc+Np)/(Nh*Nvh)))
+CapaProd=ceil(Int,ceil(CapaHub/2))
+TourHub=ceil(Int,Totalweight/CapaHub)
+x_all, y_all=rand(0:MaxCo,Np+Nh+Nc+Nh), rand(0:MaxCo,Np+Nh+Nc+Nh)
 while(test && ite<maxite)
     global test=false
     ## Node position
     global x_all, y_all=rand(0:MaxCo,Np+Nh+Nc+Nh), rand(0:MaxCo,Np+Nh+Nc+Nh)
+    x_all[Np+Nh]=50
+    y_all[Np+Nh]=50
+    x_all[Np+Nh+Nc+Nh]=50
+    y_all[Np+Nh+Nc+Nh]=50
     ## Distance
     for i in 1:Np+Nc+Nh
         for j in 1:Np+Nc+Nh
             dist2[i, j] = ceil(Int,LinearAlgebra.norm([x_all[i] - x_all[j], y_all[i] - y_all[j]], 2))
-            if(i<=Np && j>Np+Nh && j<=Np+Nh+Nc && atleast1C[j-Np-Nh]==false && dist2[i, j] <= WorkProd)
-                atleast1C[j-Np-Nh]=true
-            end
-
         end
         for j in 1:Nh
             dist2[i, j+Np+Nc+Nh] = ceil(Int,LinearAlgebra.norm([x_all[i] - x_all[j+Np], y_all[i] - y_all[j+Np]], 2))
@@ -259,15 +292,43 @@ while(test && ite<maxite)
             dist2[i+Np+Nc+Nh, j+Np+Nc+Nh] = ceil(Int,LinearAlgebra.norm([x_all[i+Np] - x_all[j+Np], y_all[i+Np] - y_all[j+Np]], 2))
         end
     end
+    
     for c in 1:Nc
-        if(atleast1C==false)
+        allgood=true
+        for k in 1:Nk
+            if demands[c,k]>0 
+                good=false
+                for i in 1:Np
+                    if stocks[i,k] >= demands[c,k] 
+                        if dist2[i, c+Np+Nh] <= WorkProd/3
+                            good=true
+                        else
+                            if DeliWindows[c,k,1]!=DeliWindows[c,k,2] || DeliWindows[c,k,1]!=1
+                                for h in 1:Nh
+                                    if dist2[Np+h,c+Np+Nh] <= WorkHub/2 && dist2[i,Np+h] <= WorkHub/2
+                                        good=true
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                if good==false
+                    allgood=false
+                end
+            end
+        end
+        if allgood==false
+            #x_all[c+Np+Nh]=rand(0:MaxCo)
+            #y_all[c+Np+Nh]=rand(0:MaxCo)
             test=true
         end
     end
     global ite+=1;
 end
 rounded_matrix = round.(dist2, digits=2)
-
+print(x_all)
+print(y_all)
 dist2=rounded_matrix
 
 ## List of clients, producers, hubs, vehicles
@@ -334,14 +395,21 @@ sizeC=Nc+Nh
 
 test=true 
 ite=1
+weighperday=zeros(Int,Nt)
 while(test && ite<maxite)
     global Prod_av=rand(0:1, Np,Nt)
     c=1
     global test=false
+    global weighperday=zeros(Int,Nt)
+
     while(c <= Nc && !test)
         k=1
         while(k <= Nk && !test)
             if(demands[c,k]>0)
+                
+                if(DeliWindows[c,k,1]==DeliWindows[c,k,2])
+                    weighperday[DeliWindows[c,k,1]]+=demands[c,k]*Psize[k]
+                end
                 if(DeliWindows[c,k,1] == DeliWindows[c,k,2] &&  DeliWindows[c,k,1]==1)
                     atleast1=false
                     for l in 1:Np
@@ -360,32 +428,13 @@ while(test && ite<maxite)
     end
     global ite+=1
 end
-Client_av=rand(0:1,Nc,Nt)
+
+println(weighperday," ",weighperCust," ",CapaHub," ",CapaProd)
+
+Client_av=ones(Int,Nc, Nt)
 Experiation_date=rand(1:Nt,Nk)
 test=true
-for c in 1:Nc
-    global test=true
-    while(test)
-        k=1
-        test=false
-        Client_av[c,:]=rand(0:1,Nt)
-        while(k <= Nk && !test)
-            atleast1=false
-            atleast1Prod=false
-            if(demands[c,k]>0)
-                for l in DeliWindows[c,k,1]:DeliWindows[c,k,2]
-                    if(Client_av[c,l]==1)
-                        atleast1=true
-                    end
-                end
-                if(!atleast1)
-                    test=true
-                end
-            end
-            k+=1
-        end
-    end
-end
+
 
 # Create a JuMP model
 model = Model(HiGHS.Optimizer)
@@ -425,7 +474,8 @@ set_silent(model)
 @constraint(model, delivernext[i in 1:Nh, t in 1:Nt, v in 1:Nv, r in 1:TourVehicle[v], k in 1:Nk, c in 1:Nc], w[PairHub[i,1], t, v,r, k, c] <= sum(w[PairHub[i,2], tt, vv, rr, k, c] for tt in 1:t-1 for vv in 1:Nv for rr in 1:TourVehicle[vv]));
 @constraint(model, HubDropAll[i in 1:Nh, k in 1:Nk, c in 1:Nc, t in 1:Nt, v in Vehicles[i+Np], r in 1:TourVehicle[v]], sum(w[j, t, v, r, k, c] for j in Pplus if PairHub[i,1]!=j) == w[PairHub[i,2], t, v, r, k, c]);
 @constraint(model, flowhub[i in 1:Nh, v in Vehicles[i+Np], r in 1:TourVehicle[v], t in 1:Nt], sum(x[PairHub[i,1], j, t ,v, r] for j in 1:node if j != PairHub[i,1])==x[PairHub[i,2], PairHub[i,1], t ,v, r]);
-@constraint(model, TooFarPoint[i in 1:Np, c in 1:Nc; dist2[i,c+Np+Nh] > WorkProd /2], sum(f[i,k,c]  for k in 1:Nk) == 0);
+#@constraint(model, TooFarPoint[i in 1:Np, c in 1:Nc; dist2[i,c+Np+Nh] > WorkProd /2], sum(f[i,k,c]  for k in 1:Nk) == 0);
+@constraint(model, TooFarPoint[i in 1:Np, j in 1:node, v in Vehicles[i], t in 1:Nt; dist2[i,j] >= WorkProd /3], sum(w[j, t, v, r, k, c]  for k in 1:Nk for c in 1:Nc for r in 1:TourVehicle[v]) == 0);
 
 @constraint(model, subtour[v in 1:Nv, t in 1:Nt, r in 1:TourVehicle[v], i in 1:node, j in 1:node; i!=j && StartVehicle[v]!=i && StartVehicle[v]!=j], u[i,t,v,r]-u[j,t,v,r]+node*x[i,j,t,v,r]+(node-2)*x[j,i,t,v,r] <= node-1);
 
@@ -440,6 +490,27 @@ set_silent(model)
 instance_name = replace(filename, ".txt" => ".lp")
 file_path = replace(filename, ".txt" => ".data")
 println(instance_name)
+countCperP=[]
+CountTotPoss=[]
+println(demands)
+for i in 1:Np  
+    countP=0
+    countC=0
+    for c in 1:Nc
+        for k in 1:Nk
+            if demands[c,k]>0 && stocks[i,k]>=demands[c,k]
+                countC+=1
+                if dist2[i,c+Np+Nh] <= WorkProd/3
+                    countP+=1
+                end
+            end
+        end
+    end
+    push!(countCperP,countP)
+    push!(CountTotPoss,countC)
+    println(countP," ",countC)
+end
+
 open(file_path, "w") do file
     # Write to the file
     write(file, "$Np $Nc $Nh $Nk $Nvh $CapaProd $WorkProd $CapaHub $WorkHub $Nt $TourHub\n")

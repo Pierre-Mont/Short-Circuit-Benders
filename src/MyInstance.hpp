@@ -5,19 +5,11 @@
 #include <sstream>
 using namespace std;
 
-
-float round2d(float var)
-{
-    // 37.66666 * 100 =3766.66
-    // 3766.66 + .5 =3767.16    for rounding off value
-    // then type cast to int so value is 3767
-    // then divided by 100 so the value converted into 37.67
-    float value = (int)(var * 100 + .5);
-    return (float)value / 100;
-}
+#ifndef MYCLASS_HPP  // Start include guard
+#define MYCLASS_HPP
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
@@ -43,6 +35,16 @@ class MyInstance{
 		string line;
 		NbOptCut=0;
 		MaxNode=0;
+		OccuHub=0;
+		OccuProd=0;
+		nbOccuProd=0;
+		nbOccuHub=0;
+		LengthTourProd=0;
+		LengthTourHub=0;
+		nbLengthTourProd=0;
+		nbLengthTourHub=0;
+		MaxOccuHub=0;
+		MaxOccuProd=0;
 		MinNode=1000;
 		ImprovedCut=ImprovedFeasCut_in;
 		MoreCuts=MoreCuts_in;
@@ -211,3 +213,4 @@ class MyInstance{
 		}
     }
 };
+#endif

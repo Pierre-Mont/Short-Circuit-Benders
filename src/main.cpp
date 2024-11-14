@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <cassert>
 #include "Bender.hpp"
-
+#include "Heuristic.hpp"
 
 int main(int argc, char *argv[]) {
     
@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
 	int Toofar=0;
 	int MoreSol=1;
 	int AddImprove=0;
+	int UseHeuristic=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -89,12 +90,6 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-ACL=") == 0) {
 			AddObjLower = std::stoi(arg.substr(5));
 		}
-		if(arg.find("-TL=") == 0) {
-			TestLogic = std::stoi(arg.substr(4));
-		}
-		if(arg.find("-SU=") == 0) {
-			SigmaUb = std::stoi(arg.substr(4));
-		}
 		if(arg.find("-LC=") == 0) {
 			LessCut = std::stoi(arg.substr(4));
 		}
@@ -110,6 +105,9 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-AI=") == 0) {
 			AddImprove = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-H=") == 0) {
+			UseHeuristic = std::stoi(arg.substr(3));
+		}
     }
 	// Initialize data containers
 	// Read the file
@@ -118,12 +116,18 @@ int main(int argc, char *argv[]) {
 		std::cerr << "Error opening file: " << inputFile << std::endl;
 		return EXIT_FAILURE;
 	}
-	MyInstance Inst;
-	
-	Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove);
-	
-	// Model the problem
-	
-	mainBend(Inst);	
+	if(AddImprove==1 && ImprovedFeasCut==0){
+		cout<<"Can't use option -AI without option -IC"<<endl;
+	}else{
+		MyInstance Inst;
+		
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove);
+		
+		// Model the problem
+		if(UseHeuristic==1)
+			FindUpper(Inst);
+		else	
+			mainBend(Inst);	
+	}
     return 0;
 }

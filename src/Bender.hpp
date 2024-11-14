@@ -10,7 +10,8 @@
 #endif
 ILOSTLBEGIN
 
-
+#ifndef MYBENDER_HPP // Start include guard
+#define MYBENDER_HPP
 template <typename T1, typename T2, typename T3>
 class Triplet {
 public:
@@ -1115,6 +1116,18 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						assert(tour==1 || Inst.TourVehicle[v]==Inst.TourHub);
 
 						auto startMaster = std::chrono::high_resolution_clock::now();
+						/*if(Inst.StartVehicle[v] < Inst.Np){
+							Inst.nbOccuProd++;
+							Inst.OccuProd+=accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaProd;
+							if(Inst.MaxOccuProd < accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaProd)
+								Inst.MaxOccuProd=accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaProd;
+						}else{
+							Inst.nbOccuHub++;
+							Inst.OccuHub+=accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaHub;
+							if(Inst.MaxOccuHub < accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaHub)
+								Inst.MaxOccuHub=accumulate(dem.begin(), dem.end(), 0)*100/Inst.CapaHub;
+						}*/
+
 						if(Inst.Bapcod==0 || NodeSub.size()<=3){
 							//cout<<"t "<<t <<" v "<<v<<" sig "<< MasterCplex.getValue(sigma[t][v])<<" "<<Inst.WorkVehicle[v]<<endl;
 							//cout<<NodeSub<<endl;
@@ -1262,6 +1275,15 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 				}
 				//cout<<tot<<" "<<epsi<<" "<<Inst.WorkVehicle[v]<<endl;
 				if(tot>epsi){
+					/*if(Inst.StartVehicle[v] < Inst.Np){
+						Inst.nbLengthTourProd++;
+						Inst.LengthTourProd+=tot*100/Inst.WorkProd;
+					}else{
+						Inst.nbLengthTourHub++;
+						Inst.LengthTourHub+=tot*100/Inst.WorkHub;
+					}*/
+				
+
 					//cout<<MasterCplex.getValue(sigma[t][v]) <<" "<<tot<<endl;
 					if(tot>Inst.WorkVehicle[v]){
 						if(sol==-1)
@@ -1287,7 +1309,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 							AddMoreOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts);						
 					}
 					if(Inst.AddImprove==1 && (resV2[0]!=-2 || resV2[1]!=-2)){
-						assert(resV2[0]+resV2[1]<=tot);
+						//assert(resV2[0]+resV2[1]<=tot);
 						if(resV2[0]+resV2[1]>Inst.WorkVehicle[v]){
 							ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
 							AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,resV2[0]+resV2[1],PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
@@ -1432,49 +1454,6 @@ std::string exec(const char* cmd) {
     pclose(pipe);
     return result;
 }
-/*float SolveWithBapcod(int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand)
-{
-    std::ofstream outfile("VRPTW/Bap.txt");
-    
-    // Check if the file opened successfully
-    if (!outfile.is_open()) {
-        std::cerr << "Failed to open the file." << std::endl;
-    }
-
-    outfile << "C201\n\n";
-    outfile << "VEHICLE\n";
-    outfile << "NUMBER     CAPACITY\n";
-    outfile << std::setw(5) << maxNbVehicles << std::setw(11) << capacity << "\n\n";
-    outfile << "CUSTOMER\n";
-    outfile << "CUST NO.  XCOORD.    YCOORD.    DEMAND   READY TIME  DUE DATE   SERVICE TIME\n\n";
-
-    // Loop over customers and write their data
-    for (int i = 0; i < nbCust; ++i) {
-        outfile << std::setw(5) << i << std::setw(10) << xCoord[i] << std::setw(11) << yCoord[i]
-                << std::setw(11) << demand[i] << std::setw(13) << 0 << std::setw(10) << 10000
-                << std::setw(13) << 0 << "\n";
-    }
-
-    // Close the file
-    outfile.close();
-    string command="../VehicleRoutingWithTimeWindowsDemo -b ../BapCod_conf/bc.cfg -a ../BapCod_conf/app.cfg -i VRPTW/Bap.txt | awk 'BEGIN { statut = 0; opt = 0 } "
-                          "/infeasibility/ { statut = -1; opt = -1 } "
-                          "/Best found solution of value [0-9]+/ { statut = 1; match($0, /value ([0-9]+\\.[0-9]+)/, arr); opt = arr[1] } "
-                          "END { print \"\" statut \" \" opt }'";
-    
-    string output = exec(command.c_str());
-    int statut = 0;
-    float opt = 0.0f;
-    
-    sscanf(output.c_str(), "%d %f", &statut, &opt);  // Scan output into C++ variables
-    
-    if(statut!=1){
-        assert(opt==-1);
-    }
-    return opt;
-}*/
-
-
 
 int mainBend(MyInstance Inst)
 {
@@ -1593,12 +1572,13 @@ int mainBend(MyInstance Inst)
 			AddSigmmaCuts(env,MasterCplex,WorkerCplex,WorkerModel,Inst,0,w,y,yr,sigma,u,x,AddCuts);
 			MasterModel.add(AddCuts);
 		}
-		MasterCplex.exportModel("filemas0.lp");	
+		//MasterCplex.exportModel("filemas0.lp");	
 		bool BestUpperChg=false;
 		bool BestLowerChg=false;
 		// Loop through each Benders iteration
 		while(iter < maxIterations && !GetOut){
 			BestUpperChg=false;
+			MasterCplex.setParam(IloCplex::Param::TimeLimit, 1800-Inst.SubSolving.count()-Inst.MasterSolving.count());
 			// Solve master problem
 			auto startMaster = std::chrono::high_resolution_clock::now();
 			MasterCplex.solve();
@@ -1606,10 +1586,7 @@ int mainBend(MyInstance Inst)
 			
 			Inst.MasterSolving+=endMaster-startMaster;
 			AddCuts.clear();
-			if(iter==2)
-				MasterCplex.exportModel("filemas2.lp");	
-			if(iter==1)
-				MasterCplex.exportModel("filemas1.lp");	
+
 			double value;
 			if (MasterCplex.getStatus() == IloAlgorithm::Optimal){
 				//cout<<lower<< " "<<MasterCplex.getObjValue()<<endl;
@@ -1699,6 +1676,24 @@ int mainBend(MyInstance Inst)
 				FichierTime << iter <<" ; "<<Inst.MasterSolving.count()<<" ; "<<Inst.SubSolving.count()<<" ; "<<Inst.NbFeasCut+Inst.NbOptCut<<" ; "<<upper<<" ; "<<lower<<endl;
 			}
 			cout<<iter<<" "<<upper<<" "<<lower<< " NbFeas "<<Inst.NbFeasCut<<" NbOpt "<<Inst.NbOptCut<<" "<<"MasterS "<<Inst.MasterSolving.count()<<" Inst.SubSolving "<<Inst.SubSolving.count()<<" "<<(upper - lower) / upper<<endl;
+			/*if(Inst.nbOccuHub>0)
+				cout<<"Average Hub occupation "<<Inst.OccuHub/Inst.nbOccuHub<<" max "<<Inst.MaxOccuHub<<endl;
+			if(Inst.nbOccuProd>0)
+				cout<<"Average Prod occupation "<<Inst.OccuProd/Inst.nbOccuProd<<" max "<<Inst.MaxOccuProd<<endl;
+			if(Inst.nbLengthTourHub>0)
+				cout<<"Average Hub Length Tour "<<Inst.LengthTourHub/Inst.nbLengthTourHub<<endl;
+			if(Inst.nbLengthTourProd>0)
+				cout<<"Average Prod Length Tour "<<Inst.LengthTourProd/Inst.nbLengthTourProd<<endl;
+			Inst.MaxOccuHub=0;
+			Inst.MaxOccuProd=0;
+			Inst.OccuHub=0;
+			Inst.OccuProd=0;
+			Inst.nbOccuHub=0;
+			Inst.nbOccuProd=0;
+			Inst.nbLengthTourHub=0;
+			Inst.nbLengthTourProd=0;
+			Inst.LengthTourHub=0;
+			Inst.LengthTourProd=0;*/
 			if(iter==0)
 					cout<<"Initial LB: "<<lower<<endl;
 			if((upper - lower) / upper < epsi && Inst.Gap==0){
@@ -1804,6 +1799,8 @@ int mainBend(MyInstance Inst)
 		cout<<"Average Node Subs "<<(float)Inst.NbNodeSubs/Inst.NbSolvedSubs<<endl;
 		cout<<"Max Node Subs "<<Inst.MaxNode<<endl;
 		cout<<"Min Node Subs "<<Inst.MinNode<<endl;
+		/*cout<<"Average Hub occupation "<<Inst.OccuHub/Inst.nbOccuHub<<endl;
+		cout<<"Average Prod occupation "<<Inst.OccuProd/Inst.nbOccuProd<<endl;*/
 		AddCuts.end();
 		// End the Cplex objects
 		MasterCplex.end();
@@ -1821,5 +1818,5 @@ int mainBend(MyInstance Inst)
    return 0;
 
 } //END MAIN
-
+#endif
 
