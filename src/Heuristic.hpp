@@ -77,7 +77,7 @@ vector<vector<array<int,6>>> coutInsertionsPick(MyInstance Inst, int currC, int 
                     }
                     if(Inst.Prod_av[p][t] && Inst.dist[p][Inst.Np+i] <= Inst.WorkProd/3 && CurrCapa[p][t]+Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaProd){
                         insert=coutInsertion(Inst,CurrChemin[p][t],i+Inst.Np+Inst.Nh+Inst.Nc);
-                        if(insert.first<resultat[i][t][0] && insert.first+CurrWork[i][t]<Inst.WorkProd){
+                        if(insert.first<resultat[i][t][0] && insert.first+CurrWork[p][t]<Inst.WorkProd){
                             resultat[i][t][0]=insert.first;
                             resultat[i][t][1]=p;
                             resultat[i][t][2]=i+Inst.Np+Inst.Nh+Inst.Nc;
@@ -204,16 +204,18 @@ int FindUpper(MyInstance Inst){
             }
         }
         if(BestCandidate!=-1){
-            cout<<"best candidtae for "<<currC<<" "<<currK<< " is producer "<<BestCandidate<<" at period "<<BestInsertion[1]<<endl;
+            //cout<<"best candidtae for "<<currC<<" "<<currK<< " is producer "<<BestCandidate<<" at period "<<BestInsertion[1]<<endl;
             CurrWork[BestCandidate][BestInsertion[1]]+=BestInsertion[2];
+            assert( CurrWork[BestCandidate][BestInsertion[1]]<=Inst.WorkProd);
             CurrCapa[BestCandidate][BestInsertion[1]]+=Inst.demands[currC][currK]*Inst.Psize[currK];
+            assert(CurrCapa[BestCandidate][BestInsertion[1]]<=Inst.CapaProd);
             DemandsProd[BestCandidate][BestInsertion[1]][Inst.Np+Inst.Nh+currC]=Inst.demands[currC][currK]*Inst.Psize[currK];
             totalwork+=Inst.dist[BestCandidate][currC+Inst.Np+Inst.Nh];
             if(BestInsertion[0]!=-2){
                 CurrChemin[BestCandidate][BestInsertion[1]].insert(CurrChemin[BestCandidate][BestInsertion[1]].begin()+BestInsertion[0]+1,currC+Inst.Np+Inst.Nh);
             }
         }else{
-            cout<<"No candidtae for "<<currC<<" "<<currK<<endl;
+            //cout<<"No candidtae for "<<currC<<" "<<currK<<endl;
             PoolHub.push_back({currC,currK});
         }
     }
@@ -340,27 +342,31 @@ int FindUpper(MyInstance Inst){
         if(BestInsertionHub[1]!=-1){
             int hub=BestInsertionHub[1];
             int period=BestInsertionHub[2];
-            cout<<"Command "<<currC<<" "<<currK<<" is fullfil by producer "<< min(InsertPick[hub][period][1],InsertPick[hub][period][2])<<" and moved from "<<InsertPick[hub][period][1]<<" to "<<InsertPick[hub][period][2]<<" during  period "<<period<<" using vehicle "<<InsertPick[hub][period][1]<<endl;
-            cout<<"Command "<<currC<<" "<<currK<<" is delivered druing period "<<BestInsertionHub[3]<<" by "<<InsertDeli[hub][BestInsertionHub[3]][1]<<" "<<endl;
+            //cout<<"Command "<<currC<<" "<<currK<<" is fullfil by producer "<< min(InsertPick[hub][period][1],InsertPick[hub][period][2])<<" and moved from "<<InsertPick[hub][period][1]<<" to "<<InsertPick[hub][period][2]<<" during  period "<<period<<" using vehicle "<<InsertPick[hub][period][1]<<endl;
+            //cout<<"Command "<<currC<<" "<<currK<<" is delivered druing period "<<BestInsertionHub[3]<<" by "<<InsertDeli[hub][BestInsertionHub[3]][1]<<" "<<endl;
             totalwork+=Inst.dist[currC+Inst.Np+Inst.Nh][min(InsertPick[hub][period][1],InsertPick[hub][period][2])];
-            
             if(InsertPick[hub][period][1]<Inst.Np){
                 DemandsProd[InsertPick[hub][period][1]][period][InsertPick[hub][period][2]]=Inst.demands[currC][currK]*Inst.Psize[currK];
                 CurrCapa[InsertPick[hub][period][1]][period]+=Inst.demands[currC][currK]*Inst.Psize[currK];
+                assert(CurrCapa[InsertPick[hub][period][1]][period]<=Inst.CapaProd);
                 CurrWork[InsertPick[hub][period][1]][period]+=InsertPick[hub][period][0];
+                assert(CurrWork[InsertPick[hub][period][1]][period]<= Inst.WorkProd);
                 assert(InsertPick[hub][period][2]==hub+Inst.Np+Inst.Nc+Inst.Nh);
                 if(InsertPick[hub][period][3]!=-2)
                     CurrChemin[InsertPick[hub][period][1]][period].insert(CurrChemin[InsertPick[hub][period][1]][period].begin()+InsertPick[hub][period][3]+1,InsertPick[hub][period][2]);
             }else{
                 CurrWorkHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period]+=InsertPick[hub][period][0];
+                assert(CurrWorkHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period]<= Inst.WorkHub);
                 //CommandsPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][BestInsertionHub[0]]=InsertPick[hub][period][2];
                 DemandsPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period].push_back(Inst.demands[currC][currK]*Inst.Psize[currK]);
                 if(InsertPick[hub][period][5]!=-1){
                     CurrCapaPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]]+=Inst.demands[currC][currK]*Inst.Psize[currK];
+                    assert(CurrCapaPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]]<=Inst.CapaHub);
                     if(InsertPick[hub][period][3]!=-2)
                         CurrPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]].insert(CurrPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]].begin()+InsertPick[hub][period][3]+1,InsertPick[hub][period][2]);
                 }else{
                     CurrCapaPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period].push_back(Inst.demands[currC][currK]*Inst.Psize[currK]);
+                    assert(Inst.demands[currC][currK]*Inst.Psize[currK]<=Inst.CapaHub);
                     if(InsertPick[hub][period][3]!=-2)
                         CurrPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period].push_back({hub+Inst.Np,InsertPick[hub][period][2]});
                 }
@@ -368,21 +374,23 @@ int FindUpper(MyInstance Inst){
             period=BestInsertionHub[3];
             CommandsDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period].push_back(InsertDeli[hub][period][2]);
             DemandsDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][2]]=Inst.demands[currC][currK]*Inst.Psize[currK];
+            CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]+=InsertDeli[hub][period][0];
+            assert(CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]<=Inst.WorkHub);
             assert(InsertDeli[hub][period][1]==hub+Inst.Np);
             if(InsertDeli[hub][period][5]!=-1){
                 CurrCapaDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][5]]+=Inst.demands[currC][currK]*Inst.Psize[currK];
-                CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]+=InsertDeli[hub][period][0];
+                assert(CurrCapaDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][5]]<=Inst.CapaHub);
                 if(InsertDeli[hub][period][3]!=-2)
                     CurrDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][5]].insert(CurrDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][5]].begin()+InsertDeli[hub][period][3]+1,InsertDeli[hub][period][2]);
             }else{
                 CurrCapaDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period].push_back(Inst.demands[currC][currK]*Inst.Psize[currK]);
-                CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]+=InsertDeli[hub][period][0];
+                assert(Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaHub);
                 if(InsertDeli[hub][period][3]!=-2)
                     CurrDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period].push_back({hub+Inst.Np,InsertDeli[hub][period][2]});
             }
             
         }else{
-            cout<<"COmmand "<<currC<<" "<<currK<<" is buggy"<<endl;
+            //cout<<"COmmand "<<currC<<" "<<currK<<" is buggy"<<endl;
             totalwork+=10000;
         }
     }
@@ -391,7 +399,7 @@ int FindUpper(MyInstance Inst){
        for (int t = 0; t < Inst.Nt; t++){
             if(CurrChemin[i][t].size()>1){
                 totalwork+=CurrWork[i][t]; 
-                cout<<"Producer "<<i<<" visits clients "<<CurrChemin[i][t]<<" during period "<< t<<endl;
+                //cout<<"Producer "<<i<<" visits clients "<<CurrChemin[i][t]<<" during period "<< t<<endl;
                 for (size_t j = 0; j < CurrChemin[i][t].size(); j++){
                     if(i!=CurrChemin[i][t][j])
                         totalwork+=Inst.dist[i][CurrChemin[i][t][j]];
@@ -404,7 +412,7 @@ int FindUpper(MyInstance Inst){
         for (int t = 0; t < Inst.Nt; t++){
             for (int v = 0; v < Inst.Nvh; v++){
                 totalwork+=CurrWorkHub[i][v][t];
-                for (size_t l = 0; l < CurrPickHub[i][v][t].size(); l++){
+                /*for (size_t l = 0; l < CurrPickHub[i][v][t].size(); l++){
                     if(CurrPickHub[i][v][t][l].size()>1){
                         cout<<"HUb "<<i<<" visits producers "<<CurrPickHub[i][v][t][l]<<" during period "<< t<<" with vehicle "<<v<<endl;
                     }
@@ -412,7 +420,7 @@ int FindUpper(MyInstance Inst){
                 for (size_t l = 0; l < CurrDeliHub[i][v][t].size(); l++){
                     if(CurrDeliHub[i][v][t][l].size()>1)
                         cout<<"HUb "<<i<<" visits clients "<<CurrDeliHub[i][v][t][l]<<" during period "<< t<<" with vehicle "<<v<<endl;
-                }
+                }*/
             }
         }
     }
@@ -448,19 +456,20 @@ int FindUpper(MyInstance Inst){
                 cons.end();
                 int tour=1;
                 assert(accumulate(dem.begin(), dem.end(), 0)<= Inst.CapaProd);
-                
-                GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkProd,Inst.CapaProd);				
+                GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkProd*100,Inst.CapaProd);
                 WorkerCplex.solve();
                 assert(WorkerCplex.getStatus()==IloAlgorithm::Optimal);
-                assert(WorkerCplex.getObjValue()<=CurrWork[i][t]);
-                assert(WorkerCplex.getObjValue()<=Inst.WorkProd);
+                assert(WorkerCplex.getObjValue()-CurrWork[i][t]<=0+0.1);
+                assert(WorkerCplex.getObjValue()-Inst.WorkProd<= 0.1);
             }
         } 
     }
-    int res;
+    int res,res2;
     for (int h = 0; h < Inst.Nh; h++){
         for (int v = 0; v < Inst.Nvh; v++){
             for (int t = 0; t < Inst.Nt; t++){
+                res=0;
+                res2=0;
                 if(CommandsDeliHub[h][v][t].size()>0){
                     NodeSub.clear();
                     sort(CommandsDeliHub[h][v][t].begin(),CommandsDeliHub[h][v][t].end());
@@ -469,7 +478,7 @@ int FindUpper(MyInstance Inst){
                         if(CommandsDeliHub[h][v][t][j]!=NodeSub.back())
                             NodeSub.push_back(CommandsDeliHub[h][v][t][j]);
                     }
-                    NodeSub.insert(NodeSub.begin(),i);
+                    NodeSub.insert(NodeSub.begin(),h+Inst.Np);
                     dem=DemandsDeliHub[h][v][t];
 
                     IloConstraintArray cons(WorkerModel.getEnv());
@@ -483,9 +492,13 @@ int FindUpper(MyInstance Inst){
 
 
                     int tour=ceil(accumulate(dem.begin(), dem.end(), 0)/(double)Inst.CapaHub);                    
-                    GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);				
-                    res=WorkerCplex.solve();
+                    GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);			
+                    /*cout<<NodeSub<<endl;
+                    cout<<"dem "<<dem<<endl;
+                    WorkerCplex.exportModel("filework.lp");*/
+                    WorkerCplex.solve();
                     assert(WorkerCplex.getStatus()==IloAlgorithm::Optimal);
+                    res=WorkerCplex.getObjValue();
                 }
                 if(CommandsPickHub[h][v][t].size()>0){
                     NodeSub.clear();
@@ -495,7 +508,7 @@ int FindUpper(MyInstance Inst){
                         if(CommandsPickHub[h][v][t][j]!=NodeSub.back())
                             NodeSub.push_back(CommandsPickHub[h][v][t][j]);
                     }
-                    NodeSub.insert(NodeSub.begin(),i);
+                    NodeSub.insert(NodeSub.begin(),h+Inst.Np);
                     dem=DemandsPickHub[h][v][t];
                     IloConstraintArray cons(WorkerModel.getEnv());
                     for (IloModel::Iterator it(WorkerModel); it.ok(); ++it) {
@@ -509,12 +522,15 @@ int FindUpper(MyInstance Inst){
 
                     int tour=ceil(accumulate(dem.begin(), dem.end(), 0)/(double)Inst.CapaHub);
                     
-                    GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);				
+                    GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);	
+                    WorkerCplex.solve();			
                     assert(WorkerCplex.getStatus()==IloAlgorithm::Optimal);
                     //cout<<WorkerCplex.getObjValue()<<" "<<CurrWorkHub[h][v][t]<<" "<<res<<endl;
-                    assert(WorkerCplex.getObjValue()+res<=CurrWorkHub[h][v][t]);
-                    assert(WorkerCplex.getObjValue()+res<=Inst.WorkHub);
+                    
+                    res2=WorkerCplex.getObjValue();
                 }
+                assert(res2+res-CurrWorkHub[h][v][t]<=0.1);
+                assert(res2+res-Inst.WorkHub<= 0.1);
             }
         } 
     }
