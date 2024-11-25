@@ -73,7 +73,6 @@ class MyInstance{
 		AddObjLower=AddObjLower_in;
 		AddImprove=AddImprove_in;
 		YannickT=YannickT_in;
-		int totaldemand=0;
         while (getline(file, line)) {
 			istringstream iss(line);
 			if (count == 0) {
@@ -163,13 +162,6 @@ class MyInstance{
 					iss >> re;
 					Psize.push_back(re);	
 				}
-
-				for (int i = 0; i < Nc; i++)
-				{
-					for (int j = 0; j < Nk; j++){
-						totaldemand+=demands[i][j]*Psize[j];
-					}
-				}
 			}else if(count == 9){
 				int re;
 				for (int i = 0; i < node; i++)
@@ -194,8 +186,7 @@ class MyInstance{
 			Cmoins.push_back(i+Np+Nh);
 		}
 		
-		int numvehi=Np;
-		TourHub=ceil(totaldemand/(double)CapaHub);
+		int numvehi=Np;		
 		for (int i = 0; i < Nh; i++){
 			Vehicles.push_back({});
 			Pplus.push_back(i+Np);
