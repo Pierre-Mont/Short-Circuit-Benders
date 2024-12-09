@@ -9,7 +9,7 @@ using namespace std;
 #define MYCLASS_HPP
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
@@ -18,10 +18,11 @@ class MyInstance{
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
+	vector<float> GAPlist;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
+	bool addcut;
 	string intputFile;
 	std::chrono::duration<double> MasterSolving,SubSolving;
-
 	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int Toofar_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in) {
         ifstream file(inputFile_in);
 		if (!file.is_open()) {
@@ -73,6 +74,8 @@ class MyInstance{
 		AddObjLower=AddObjLower_in;
 		AddImprove=AddImprove_in;
 		YannickT=YannickT_in;
+		GAPlist={0.2,0.1,0.05,0.025,0.0};
+		CurrGAP=0;
         while (getline(file, line)) {
 			istringstream iss(line);
 			if (count == 0) {
