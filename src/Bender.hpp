@@ -1790,14 +1790,21 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						}
 					}
 					
-					if(VarPickHub[h].size()>0){						
+					if(VarPickHub[h].size()>0){		
+						bool EasySolHigh=true;				
 						ProblemHubPick[h].push_back(h+Inst.Np);
 						DemandsProblemHubPick[h].push_back(0);
-						for (size_t i = 0; i < VarPickHub[h].size(); i++)
-						{
+						vector <int> demandepernode(Inst.Np+Inst.Nh,0);
+						vector <bool> split(Inst.Np+Inst.Nh,true),splitted;
+						for (size_t i = 0; i < VarPickHub[h].size(); i++){
 							//cout<<VarPickHub[h][i][0]<<" "<<VarPickHub[h][i][1]<<" "<<VarPickHub[h][i][2]<<endl;
 							ProblemHubPick[h].push_back(VarPickHub[h][i][0]);
 							DemandsProblemHubPick[h].push_back(Inst.demands[VarPickHub[h][i][2]][VarPickHub[h][i][1]]*Inst.Psize[VarPickHub[h][i][1]]);
+							demandepernode[ProblemHubPick[h].back()+1]+=DemandsProblemHubPick[h].back();
+							if(demandepernode[ProblemHubPick[h].back()+1]>Inst.CapaHub){
+								EasySolHigh=false;
+								split[ProblemHubPick[h].back()]=false;
+							}
 						}
 						
 						//int tour=ceil(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0)/(double)Inst.CapaHub);
@@ -1807,45 +1814,60 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								vrpstw::Loader loader;
 								BcInitialisation bapcodInit("../config/bc.cfg");
 								bool EasySolLow=false;
-								bool EasySolHigh=true;
-								vector<int> xCoord,yCoord,demandbap,DistDepot,demandepernode(Inst.Np+1,0),nodeMaster;
+								vector<int> xCoord,yCoord,demandbap,DistDepot,nodeMaster,posinPick;
 								if(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0) <= Inst.CapaHub){
 									EasySolLow=true;
 								}
-								
-								for (int i = 0; i < (int) ProblemHubPick[h].size(); i++){
-									if(i!=0)
-										demandepernode[ProblemHubPick[h][i]+1]+=DemandsProblemHubPick[h][i];
-									if(demandepernode[ProblemHubPick[h][i]+1]>Inst.CapaHub)
-										EasySolHigh=false;
-									if(!EasySolLow && Inst.YannickT==1){
-										xCoord.push_back(Inst.x_all[ProblemHubPick[h][i]]);
-										yCoord.push_back(Inst.y_all[ProblemHubPick[h][i]]);
-										demandbap.push_back(DemandsProblemHubPick[h][i]);
-										DistDepot.push_back(Inst.dist[Inst.StartVehicle[Inst.Np+h]][ProblemHubPick[h][i]]);
+								if(!EasySolLow && Inst.YannickT==1){
+									for (int i = 0; i < (int) ProblemHubPick[h].size(); i++){
+										if(!EasySolLow && Inst.YannickT==1){
+											xCoord.push_back(Inst.x_all[ProblemHubPick[h][i]]);
+											yCoord.push_back(Inst.y_all[ProblemHubPick[h][i]]);
+											demandbap.push_back(DemandsProblemHubPick[h][i]);
+											DistDepot.push_back(Inst.dist[Inst.StartVehicle[Inst.Np+h]][ProblemHubPick[h][i]]);
+										}
 									}
-								}
-								if(EasySolLow || Inst.YannickT==2){
+								}else{
 									xCoord.push_back(Inst.x_all[Inst.StartVehicle[Inst.Np+h]]);
 									yCoord.push_back(Inst.y_all[Inst.StartVehicle[Inst.Np+h]]);
 									DistDepot.push_back(0);
 									demandbap.push_back(0);
 									nodeMaster.push_back(Inst.StartVehicle[Inst.Np+h]);
-									for (int i = 0; i < Inst.Np; i++){
-										if(demandepernode[i+1]>0){
-											xCoord.push_back(Inst.x_all[i]);
-											yCoord.push_back(Inst.y_all[i]);
-											nodeMaster.push_back(i);
-											DistDepot.push_back(Inst.dist[Inst.StartVehicle[Inst.Np+h]][i]);
-											demandbap.push_back(demandepernode[i+1]);
+									splitted.push_back(false);
+									posinPick.push_back(0);
+									for (int i = 0; i < Inst.Np +Inst.Nh; i++){
+										if(demandepernode[i+1]>0 && i!= Inst.StartVehicle[Inst.Np+h]){
+											if(split[i]){
+												xCoord.push_back(Inst.x_all[i]);
+												yCoord.push_back(Inst.y_all[i]);
+												nodeMaster.push_back(i);
+												DistDepot.push_back(Inst.dist[Inst.StartVehicle[Inst.Np+h]][i]);
+												demandbap.push_back(demandepernode[i+1]);
+												splitted.push_back(false);
+												posinPick.push_back(0);
+											}else{
+												assert(demandepernode[i+1]>Inst.CapaHub);
+												for (int j = 0; j < (int) ProblemHubPick[h].size(); j++){
+													if(ProblemHubPick[h][j]==i){
+														xCoord.push_back(Inst.x_all[ProblemHubPick[h][j]]);
+														yCoord.push_back(Inst.y_all[ProblemHubPick[h][j]]);
+														demandbap.push_back(DemandsProblemHubPick[h][j]);
+														DistDepot.push_back(Inst.dist[Inst.StartVehicle[Inst.Np+h]][ProblemHubPick[h][j]]);
+														splitted.push_back(true);
+														nodeMaster.push_back(i);
+														posinPick.push_back(j);
+													}
+												}
+											}
 										}
 									}
 								}
 								/*cout<<"Pick PROBLEM"<<tour<<endl;
 								cout<<ProblemHubPick[h]<<endl;
-								cout<<xCoord<<" "<<yCoord<<endl;
-								cout<<demandbap<<endl;*/
-								
+								cout<<"coord "<<xCoord<<" "<<yCoord<<endl;
+								cout<<"dembap "<<demandbap<<endl;
+								cout<<"dem nodes "<<demandepernode<<endl;
+								cout<<"demprob "<<DemandsProblemHubPick[h]<<endl;*/
 								opt2=0;
 								//cout<<accumulate(demandepernode.begin(), demandepernode.end(), 0)<<" "<<Inst.CapaHub<<endl;
 								//cout<<(float)accumulate(demandepernode.begin(), demandepernode.end(), 0)/Inst.CapaHub<<" "<<demandepernode.size()-2<<endl;
@@ -1864,7 +1886,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								if(!EasySolHigh){
 									pair<float,vector<vector<int>>> ResTour;	
 									ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot);
-									
 									if(!EasySolLow && Inst.YannickT==1){
 										TourPick=ResTour.second;
 										opt2=ResTour.first;
@@ -1890,10 +1911,14 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 													TourCostPick.back()+=Inst.dist[nodeMaster[j]][nodeMaster[ResTour.second[i][j]]];
 												else
 													TourCostPick.back()+=Inst.dist[nodeMaster[ResTour.second[i][j]]][nodeMaster[ResTour.second[i][j-1]]];
-												for (size_t l = 0; l < ProblemHubPick[h].size(); l++){
-													if(ProblemHubPick[h][l]==nodeMaster[ResTour.second[i][j]]){
-														TourPick.back().push_back(l);
-													}										
+												if(!splitted[ResTour.second[i][j]]){
+													for (size_t l = 0; l < ProblemHubPick[h].size(); l++){
+														if(ProblemHubPick[h][l]==nodeMaster[ResTour.second[i][j]]){
+															TourPick.back().push_back(l);
+														}										
+													}
+												}else{
+													TourPick.back().push_back(posinPick[ResTour.second[i][j]]);
 												}
 											}
 											TourCostPick.back()+=Inst.dist[nodeMaster[0]][ProblemHubPick[h][TourPick.back().back()]];
