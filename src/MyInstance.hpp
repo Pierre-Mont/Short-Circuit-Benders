@@ -74,7 +74,10 @@ class MyInstance{
 		AddObjLower=AddObjLower_in;
 		AddImprove=AddImprove_in;
 		YannickT=YannickT_in;
-		GAPlist={0.2,0.1,0.05,0.025,0.0};
+		if(Gap==5)
+			GAPlist={0.2,0.1,0.05,0.025,0.0};
+		if(Gap==6)
+			GAPlist={0.1,0.05,0.025,0.0};
 		CurrGAP=0;
         while (getline(file, line)) {
 			istringstream iss(line);
