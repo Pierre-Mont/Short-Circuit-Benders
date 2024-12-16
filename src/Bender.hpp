@@ -1737,11 +1737,16 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						}
 						//int tour=ceil(accumulate(DemandsProblemHubDeli[h].begin(), DemandsProblemHubDeli[h].end(), 0)/(double)Inst.CapaHub);
 						int tour=ProblemHubDeli[h].size();
-						if(Inst.Bapcod==1){
+						if(Inst.Bapcod>=1){
 						#ifdef USE_BAP
 							
 							vrpstw::Loader loader;
-							BcInitialisation bapcodInit("../config/bc2.cfg");
+							string myfile;
+							if(Inst.Bapcod==1)
+								myfile="../config/bc.cfg";
+							else
+								myfile="../config/bc2.cfg";
+							BcInitialisation bapcodInit(myfile);
 							vector<int> xCoord,yCoord,demandbap,DistDepot;
 							for (int i = 0; i < (int) ProblemHubDeli[h].size(); i++)
 							{
@@ -1841,10 +1846,15 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						
 						//int tour=ceil(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0)/(double)Inst.CapaHub);
 						int tour=ProblemHubPick[h].size();
-						if(Inst.Bapcod==1){
+						if(Inst.Bapcod>=1){
 							#ifdef USE_BAP
 								vrpstw::Loader loader;
-								BcInitialisation bapcodInit("../config/bc2.cfg");
+								string myfile;
+								if(Inst.Bapcod==1)
+									myfile="../config/bc.cfg";
+								else
+									myfile="../config/bc2.cfg";
+								BcInitialisation bapcodInit(myfile);
 								bool EasySolLow=false;
 								vector<int> xCoord,yCoord,demandbap,DistDepot,nodeMaster,posinPick;
 								if(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0) <= Inst.CapaHub){
