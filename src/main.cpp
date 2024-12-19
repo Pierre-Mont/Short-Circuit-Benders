@@ -34,7 +34,6 @@ int main(int argc, char *argv[]) {
 	int SigmaUb=0;
 	int LessCut=0;
 	int ColdStart=0;
-	int Toofar=0;
 	int MoreSol=1;
 	int AddImprove=0;
 	int UseHeuristic=0;
@@ -98,9 +97,6 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-CS=") == 0) {
 			ColdStart = std::stoi(arg.substr(4));
 		}
-		if(arg.find("-TF=") == 0) {
-			Toofar = std::stoi(arg.substr(4));
-		}
 		if(arg.find("-MS=") == 0) {
 			MoreSol = std::stoi(arg.substr(4));
 		}
@@ -129,7 +125,7 @@ int main(int argc, char *argv[]) {
 	}else{
 		MyInstance Inst;
 		
-		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,Toofar,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit);
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit);
 		
 		// Model the problem
 		int ub=10000;
