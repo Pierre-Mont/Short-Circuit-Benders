@@ -1,7 +1,7 @@
 #include "MyInstance.hpp"
 #include "Bender.hpp"
 #include <vector>
-
+#include <algorithm>
 
 
  pair<int,int> coutInsertion(MyInstance Inst, vector<int> CurrChemin, int newpoint){
@@ -219,7 +219,7 @@ int FindUpper(MyInstance Inst){
             PoolHub.push_back({currC,currK});
         }
     }
-    sort(PoolHub.begin(), PoolHub.end(), [&Inst](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+    std::sort(PoolHub.begin(), PoolHub.end(), [&Inst](const std::pair<int, int>& a, const std::pair<int, int>& b) {
         if(Inst.DeliWindowsLat[a.first][a.second]-Inst.DeliWindowsEar[a.first][a.second] == Inst.DeliWindowsLat[b.first][b.second]-Inst.DeliWindowsEar[b.first][b.second]){
                 if(Inst.DeliWindowsEar[a.first][a.second]==Inst.DeliWindowsEar[b.first][b.second]){
                     return Inst.demands[a.first][a.second]*Inst.Psize[a.second] > Inst.demands[b.first][b.second]*Inst.Psize[b.second];

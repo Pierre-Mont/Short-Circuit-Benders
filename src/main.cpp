@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
 	int UseHeuristic=0;
 	int YannickT=0;
 	int TimeLimit=1800;
+	int NewForm=0;
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -112,6 +113,9 @@ int main(int argc, char *argv[]) {
 		if(arg.find("-TL=") == 0) {
 			TimeLimit = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-NF=") == 0) {
+			NewForm = std::stoi(arg.substr(4));
+		}
     }
 	// Initialize data containers
 	// Read the file
@@ -125,7 +129,7 @@ int main(int argc, char *argv[]) {
 	}else{
 		MyInstance Inst;
 		
-		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit);
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm);
 		
 		// Model the problem
 		int ub=10000;
