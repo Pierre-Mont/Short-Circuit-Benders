@@ -163,7 +163,7 @@ class MyInstance{
 							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
 								MinD=re;
 						}
-						dist.back().push_back(int(ceil(re)));
+						dist.back().push_back(int(ceil(re-0.0000001)));
 					}
 					MinDist.push_back(int(ceil(MinD)));
 				}

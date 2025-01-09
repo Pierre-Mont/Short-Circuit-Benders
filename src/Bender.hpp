@@ -43,8 +43,8 @@ ostream &operator<<(std::ostream &os, const std::vector<vector<T>> &input)
     }
 	os<< "]";
     return os;
-}
-
+    }
+    
 
 
 void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>>& w, IloArray<IloArray<IloNumVar>>& sigma,IloArray<IloArray<IloBoolVarArray>>& f,IloArray<IloArray<IloBoolVarArray>>& y, IloArray<IloArray<IloNumVarArray>>& fr, IloArray<IloArray<IloNumVarArray>>& yr ) {
@@ -1592,6 +1592,8 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								if(res[s]==-2){
 									vrpstw::Loader loader;
 									BcInitialisation bapcodInit("../config/bc.cfg");
+									//BcInitialisation bapcodInit("/home/pmontalbano/Short-Circuit-Benders/config/bc.cfg");
+
 									vector<int> xCoord,yCoord,demandbap,DistDepot;
 									for (int i = 0; i < (int) NodeSub.size(); i++)
 									{
@@ -1814,7 +1816,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 		}
 				  
 		if(Inst.YannickT>=1 && (Inst.MoreSol==1 || MasterCplex.getObjValue()== MasterCplex.getObjValue(sol))){
-			int opt1,opt2, SigmaHub;;
+			int opt1,opt2, SigmaHub;
 			vector<int> TourCostPick,TourCostDeli;
 			vector<vector<int>> TourPick, TourDeli;
 			
@@ -1851,7 +1853,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						}
 						//int tour=ceil(accumulate(DemandsProblemHubDeli[h].begin(), DemandsProblemHubDeli[h].end(), 0)/(double)Inst.CapaHub);
 						int tour=ProblemHubDeli[h].size();
-						if(!OneVertex){
+						if(!OneVertex ){
 							if(Inst.Bapcod>=1){
 							#ifdef USE_BAP
 								
@@ -1935,7 +1937,19 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								WorkerModel2.end();
 								env2.end();
 							}
+						}else{
+							assert(TourCostDeli.back()==0);
+							//TourPick.push_back({});
+							//TourCostPick.push_back(0);
+							for (size_t i = 0; i < ceil(accumulate(DemandsProblemHubDeli[h].begin(), DemandsProblemHubDeli[h].end(), 0)/(double)Inst.CapaHub); i++){
+								TourDeli.back().push_back(1);
+								TourDeli.push_back({});
+								TourCostDeli.back()+=2*Inst.dist[Inst.Np+h][ProblemHubDeli[h][1]];
+								TourCostDeli.push_back(0);
+								opt1+=2*Inst.dist[Inst.Np+h][ProblemHubDeli[h][1]];
+							}
 						}
+						
 					}
 					if(VarPickHub[h].size()>0){	
 						bool OneVertex=true;
@@ -1957,7 +1971,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						
 						//int tour=ceil(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0)/(double)Inst.CapaHub);
 						int tour=ProblemHubPick[h].size();
-						if(ProblemHubPick[h].size()>2 && !OneVertex){
+						if(!OneVertex){
 							if(Inst.Bapcod>=1){
 								#ifdef USE_BAP
 									vrpstw::Loader loader;
@@ -2016,7 +2030,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 									
 									
 									pair<float,vector<vector<int>>> ResTour;	
-									ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaHub,Inst.WorkHub,min((int)demandbap.size(),Inst.Nvh*(Inst.Np+Inst.Nh-1)),xCoord,yCoord,demandbap,DistDepot);
+									ResTour=SolveWithBapcod(bapcodInit,loader,min(tour,Inst.Nvh*(Inst.Np+Inst.Nh-1)),Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot);
 									//cout<<ResTour.second<<" "<<ProblemHubPick[h]<<" "<<endl;
 									if(ResTour.first!=-1){
 										if(Inst.YannickT==1){
@@ -2324,6 +2338,8 @@ int mainBend(MyInstance Inst, int BestUpper)
 		MasterCplex.setOut(env.getNullStream());  // Suppress log output
 		MasterCplex.setWarning(env.getNullStream());
 		MasterCplex.setParam(IloCplex::Param::MIP::Display, 0);
+		//MasterCplex.setParam(IloCplex::Param::RandomSeed, 12345);
+		
 		if(Inst.Gap>=1)
 			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[0]);
 		MasterCplex.setParam(IloCplex::Param::Threads, 1);
@@ -2422,7 +2438,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 			BestUpperChg=false;
 			
 			MasterCplex.setParam(IloCplex::Param::TimeLimit, max(10.0,Inst.TimeLimit-Inst.SubSolving.count()-Inst.MasterSolving.count()));
-		
+
 			// Solve master problem
 			auto startMaster = std::chrono::high_resolution_clock::now();
 			MasterCplex.solve();
@@ -2447,8 +2463,9 @@ int mainBend(MyInstance Inst, int BestUpper)
 
 				IloNumArray solution(env);
 				//assert(lower <= MasterCplex.getObjValue() + 0.1);
-				if(MasterCplex.getBestObjValue()> lower){
-					lower=ceil(MasterCplex.getBestObjValue());
+				if(ceill(MasterCplex.getBestObjValue()-0.00000001)> lower){
+					
+					lower=ceill(MasterCplex.getBestObjValue()-0.00000001);
 					BestLowerChg=true;
 				}
 				
@@ -2574,7 +2591,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 			Inst.LengthTourProd=0;*/
 			if(iter==0)
 					cout<<"Initial LB: "<<lower<<endl;
-			if((upper - lower) / upper < epsi && (Inst.Gap!=0 || Inst.GAPlist[Inst.CurrGAP]==0.0)){
+			if((upper - lower) / upper < epsi && (Inst.Gap==0 || Inst.GAPlist[Inst.CurrGAP]==0.0)){
 				cout<<"Terminating with the optimal solution"<<endl;
             	cout<<"Optimal value: "<<lower<<endl;
 				if(Inst.NoObj==1){
