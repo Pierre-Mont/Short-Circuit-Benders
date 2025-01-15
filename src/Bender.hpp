@@ -2419,7 +2419,8 @@ int mainBend(MyInstance Inst, int BestUpper)
 		//MasterCplex.setParam(IloCplex::Param::RandomSeed, 12345);
 		
 		if(Inst.Gap>=1)
-			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[0]);
+			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[Inst.CurrGAP]);
+		cout<<Inst.GAPlist[Inst.CurrGAP]<<endl;
 		MasterCplex.setParam(IloCplex::Param::Threads, 1);
 		if(Inst.MoreSol>1){
 			MasterCplex.setParam(IloCplex::Param::MIP::Pool::Capacity, Inst.MoreSol);
@@ -2514,12 +2515,20 @@ int mainBend(MyInstance Inst, int BestUpper)
 		// Loop through each Benders iteration
 		while(iter < maxIterations && !GetOut){
 			BestUpperChg=false;
-			
-			MasterCplex.setParam(IloCplex::Param::TimeLimit, max(10.0,Inst.TimeLimit-Inst.SubSolving.count()-Inst.MasterSolving.count()));
-
-			// Solve master problem
 			auto startMaster = std::chrono::high_resolution_clock::now();
-			MasterCplex.solve();
+			if(Inst.GAP0==1){
+				MasterCplex.setParam(IloCplex::Param::TimeLimit, min(30.0,max(Inst.TimeLimit-Inst.SubSolving.count()-Inst.MasterSolving.count(),10.0)));
+				MasterCplex.solve();
+				cout<<MasterCplex.getStatus()<<endl;
+				if (MasterCplex.getStatus() != IloAlgorithm::Optimal && MasterCplex.getStatus()  != IloAlgorithm::Infeasible){
+					Inst.GAP0=0;
+					Inst.CurrGAP=0;
+				}
+			}
+			if(Inst.GAP0==0){
+				MasterCplex.setParam(IloCplex::Param::TimeLimit, max(10.0,Inst.TimeLimit-Inst.SubSolving.count()-Inst.MasterSolving.count()));
+				MasterCplex.solve();
+			}
 			auto endMaster = std::chrono::high_resolution_clock::now();
 			
 			Inst.MasterSolving+=endMaster-startMaster;
@@ -2737,15 +2746,15 @@ int mainBend(MyInstance Inst, int BestUpper)
 				cout<<"Delivery Prod "<<TotDelProd<<endl;
 				cout<<"Delivery Hub "<<TotDelHub<<endl;
 				GetOut=true;
-			}if(Inst.Gap!=0 && Inst.Gap<5 && (upper - lower) / upper< Inst.GAPlist[Inst.CurrGAP]){
+			}if(Inst.Gap!=0 && Inst.GAP0==0 && Inst.Gap<5 && (upper - lower) / upper< Inst.GAPlist[Inst.CurrGAP]){
 				Inst.CurrGAP=Inst.CurrGAP+1;
 				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[Inst.CurrGAP]);
-			}else if(Inst.Gap!=0 && Inst.Gap<5 && (upper - lower) / upper > Inst.GAPlist[Inst.CurrGAP]){
+			}else if(Inst.Gap!=0 && Inst.GAP0==0 && Inst.Gap<5 && (upper - lower) / upper > Inst.GAPlist[Inst.CurrGAP]){
 				if(Inst.CurrGAP!=0){
 					Inst.CurrGAP=Inst.CurrGAP-1;
 					MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[Inst.CurrGAP]);
 				}
-			}else if(Inst.Gap>=5){
+			}else if(Inst.Gap>=5 && Inst.GAP0==0){
 				if(AddCuts.getSize()==0){
 					if(Inst.CurrGAP!=(int)Inst.GAPlist.size()-1){
 						Inst.CurrGAP=Inst.CurrGAP+1;
