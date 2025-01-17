@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
 	int TimeLimit=1800;
 	int NewForm=0;
 	int GAP0=0;
+	string Output="";
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         // Check if the argument is a verbosity option
@@ -119,6 +120,8 @@ int main(int argc, char *argv[]) {
 		}
 		if(arg.find("-EX=") == 0) {
 			GAP0 = std::stoi(arg.substr(4));
+		}if(arg.find("-OUT=") == 0) {
+			Output = arg.substr(5);
 		}
     }
 	// Initialize data containers
@@ -133,7 +136,7 @@ int main(int argc, char *argv[]) {
 	}else{
 		MyInstance Inst;
 		
-		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0);
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0,Output);
 		
 		// Model the problem
 		int ub=10000;

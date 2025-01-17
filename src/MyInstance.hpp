@@ -19,12 +19,12 @@ class MyInstance{
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
 	vector<float> GAPlist;
-	string configFile;
+	string configFile,Output;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
 	bool addcut;
 	string intputFile;
 	std::chrono::duration<double> MasterSolving,SubSolving;
-	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in) {
+	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in, string Output_in) {
         ifstream file(inputFile_in);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile_in << std::endl;
@@ -77,6 +77,7 @@ class MyInstance{
 		TimeLimit=TimeLimit_in;
 		NewForm=NewForm_in;
 		GAP0=GAP0_in;
+		Output=Output_in;
 		if(Bapcod==1)
 			configFile="../config/bc.cfg";
 		else
