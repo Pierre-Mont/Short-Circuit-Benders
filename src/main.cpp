@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
 	int TimeLimit=1800;
 	int NewForm=0;
 	int GAP0=0;
+	int SameLB=100;
 	string Output="";
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -122,6 +123,8 @@ int main(int argc, char *argv[]) {
 			GAP0 = std::stoi(arg.substr(4));
 		}if(arg.find("-OUT=") == 0) {
 			Output = arg.substr(5);
+		}if(arg.find("-SLB=") == 0) {
+			SameLB = std::stoi(arg.substr(5));
 		}
     }
 	// Initialize data containers
@@ -136,12 +139,19 @@ int main(int argc, char *argv[]) {
 	}else{
 		MyInstance Inst;
 		
-		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0,Output);
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0,Output,SameLB);
 		
 		// Model the problem
 		int ub=10000;
-		if(UseHeuristic>=1)
+		if(UseHeuristic>=1){
 			ub=FindUpper(Inst);
+			string ubfile = inputFile+".UB";
+			ofstream myfile;
+			myfile.open (ubfile);
+			myfile << ub;
+			myfile.close();
+
+		}
 		if(UseHeuristic!=1)
 			mainBend(Inst,ub);	
 	}

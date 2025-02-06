@@ -491,7 +491,7 @@ int FindUpper(MyInstance Inst){
                     cons.end();
 
 
-                    int tour=ceil(accumulate(dem.begin(), dem.end(), 0)/(double)Inst.CapaHub);                    
+                    int tour=NodeSub.size()-1;                    
                     GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);			
                     /*cout<<NodeSub<<endl;
                     cout<<"dem "<<dem<<endl;
