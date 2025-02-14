@@ -9,7 +9,7 @@ using namespace std;
 #define MYCLASS_HPP
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB,ImortanceObj;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
@@ -24,7 +24,7 @@ class MyInstance{
 	bool addcut;
 	string intputFile;
 	std::chrono::duration<double> MasterSolving,SubSolving;
-	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in, string Output_in, int SameLB_in) {
+	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in, string Output_in, int SameLB_in, int ImortanceObj_in) {
         ifstream file(inputFile_in);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile_in << std::endl;
@@ -79,6 +79,7 @@ class MyInstance{
 		GAP0=GAP0_in;
 		Output=Output_in;
 		SameLB=SameLB_in;
+		ImortanceObj=ImortanceObj_in;
 		if(Bapcod==1)
 			configFile="../config/bc.cfg";
 		else
@@ -165,13 +166,14 @@ class MyInstance{
 					for (int j = 0; j < node; j++){
 						iss >> re;
 						if(i!=j && MinD>re){
-							if(i<Np || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
+							if((i<Np && j>Np) || (i>=Np+Nh && i<Np+Nh+Nc) || (j!=i+Nh+Nc && j!=i-Nh-Nc))
 								MinD=re;
 						}
 						dist.back().push_back(int(ceil(re-0.0000001)));
 					}
 					MinDist.push_back(int(ceil(MinD)));
 				}
+				cout<<endl;
 			}else if(count == 8){
 				int re;
 				for (int i = 0; i < Nk; i++)

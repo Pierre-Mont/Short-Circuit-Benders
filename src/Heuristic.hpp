@@ -75,7 +75,7 @@ vector<vector<array<int,6>>> coutInsertionsPick(MyInstance Inst, int currC, int 
                             resultat[i][t][5]=-1;
                         }
                     }
-                    if(Inst.Prod_av[p][t] && Inst.dist[p][Inst.Np+i] <= Inst.WorkProd/3 && CurrCapa[p][t]+Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaProd){
+                    if(Inst.Prod_av[p][t] && Inst.dist[p][Inst.Np+i] <= 42 && CurrCapa[p][t]+Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaProd){
                         insert=coutInsertion(Inst,CurrChemin[p][t],i+Inst.Np+Inst.Nh+Inst.Nc);
                         if(insert.first<resultat[i][t][0] && insert.first+CurrWork[p][t]<Inst.WorkProd){
                             resultat[i][t][0]=insert.first;
@@ -146,7 +146,7 @@ int FindUpper(MyInstance Inst){
                 i=0;
                 atleastoneprod=false;
                 while(!atleastoneprod && i < Inst.Np){
-                    if(Inst.stocks[i][k] >= Inst.demands[c][k] && Inst.dist[i][c+Inst.Np+Inst.Nh]<=Inst.WorkProd/3 && accumulate(Inst.Prod_av[i].begin()+Inst.DeliWindowsEar[c][k]-1, Inst.Prod_av[i].begin()+Inst.DeliWindowsLat[c][k], 0)>=1){
+                    if(Inst.stocks[i][k] >= Inst.demands[c][k] && Inst.dist[i][c+Inst.Np+Inst.Nh]<= 42 && accumulate(Inst.Prod_av[i].begin()+Inst.DeliWindowsEar[c][k]-1, Inst.Prod_av[i].begin()+Inst.DeliWindowsLat[c][k], 0)>=1){
                         atleastoneprod=true;
                     }
                     i++;
@@ -188,7 +188,7 @@ int FindUpper(MyInstance Inst){
         BestCandidate=-1;
         BestInsertion={-1,-1,1000};
         for (int j = 0; j < Inst.Np; j++){
-            if(CurrStocks[j][currK]>= Inst.demands[currC][currK] && Inst.dist[j][currC+Inst.Np+Inst.Nh]<=Inst.WorkProd/3){
+            if(CurrStocks[j][currK]>= Inst.demands[currC][currK] && Inst.dist[j][currC+Inst.Np+Inst.Nh]<=42 ){
                 for (int k = Inst.DeliWindowsEar[currC][currK]-1; k < Inst.DeliWindowsLat[currC][currK]; k++){
                     assert(k>=0);
                     if(Inst.Prod_av[j][k] && CurrCapa[j][k]+Inst.demands[currC][currK]*Inst.Psize[currK]<=Inst.CapaProd){
@@ -211,6 +211,7 @@ int FindUpper(MyInstance Inst){
             assert(CurrCapa[BestCandidate][BestInsertion[1]]<=Inst.CapaProd);
             DemandsProd[BestCandidate][BestInsertion[1]][Inst.Np+Inst.Nh+currC]=Inst.demands[currC][currK]*Inst.Psize[currK];
             totalwork+=Inst.dist[BestCandidate][currC+Inst.Np+Inst.Nh];
+            CurrStocks[BestCandidate][currK]-=Inst.demands[currC][currK];
             if(BestInsertion[0]!=-2){
                 CurrChemin[BestCandidate][BestInsertion[1]].insert(CurrChemin[BestCandidate][BestInsertion[1]].begin()+BestInsertion[0]+1,currC+Inst.Np+Inst.Nh);
             }
@@ -344,6 +345,7 @@ int FindUpper(MyInstance Inst){
             int period=BestInsertionHub[2];
             //cout<<"Command "<<currC<<" "<<currK<<" is fullfil by producer "<< min(InsertPick[hub][period][1],InsertPick[hub][period][2])<<" and moved from "<<InsertPick[hub][period][1]<<" to "<<InsertPick[hub][period][2]<<" during  period "<<period<<" using vehicle "<<InsertPick[hub][period][1]<<endl;
             //cout<<"Command "<<currC<<" "<<currK<<" is delivered druing period "<<BestInsertionHub[3]<<" by "<<InsertDeli[hub][BestInsertionHub[3]][1]<<" "<<endl;
+            CurrStocks[min(InsertPick[hub][period][1],InsertPick[hub][period][2])][currK]-=Inst.demands[currC][currK];
             totalwork+=Inst.dist[currC+Inst.Np+Inst.Nh][min(InsertPick[hub][period][1],InsertPick[hub][period][2])];
             if(InsertPick[hub][period][1]<Inst.Np){
                 DemandsProd[InsertPick[hub][period][1]][period][InsertPick[hub][period][2]]=Inst.demands[currC][currK]*Inst.Psize[currK];
@@ -358,7 +360,7 @@ int FindUpper(MyInstance Inst){
                 CurrWorkHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period]+=InsertPick[hub][period][0];
                 assert(CurrWorkHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period]<= Inst.WorkHub);
                 //CommandsPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][BestInsertionHub[0]]=InsertPick[hub][period][2];
-                DemandsPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period].push_back(Inst.demands[currC][currK]*Inst.Psize[currK]);
+                DemandsPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][1]]+=Inst.demands[currC][currK]*Inst.Psize[currK];
                 if(InsertPick[hub][period][5]!=-1){
                     CurrCapaPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]]+=Inst.demands[currC][currK]*Inst.Psize[currK];
                     assert(CurrCapaPickHub[InsertPick[hub][period][1]-Inst.Np][InsertPick[hub][period][4]][period][InsertPick[hub][period][5]]<=Inst.CapaHub);
@@ -372,7 +374,7 @@ int FindUpper(MyInstance Inst){
                 }
             }
             period=BestInsertionHub[3];
-            CommandsDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period].push_back(InsertDeli[hub][period][2]);
+            //CommandsDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period].push_back(InsertDeli[hub][period][2]);
             DemandsDeliHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period][InsertDeli[hub][period][2]]=Inst.demands[currC][currK]*Inst.Psize[currK];
             CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]+=InsertDeli[hub][period][0];
             assert(CurrWorkHub[InsertDeli[hub][period][1]-Inst.Np][InsertDeli[hub][period][4]][period]<=Inst.WorkHub);
@@ -403,6 +405,7 @@ int FindUpper(MyInstance Inst){
                 for (size_t j = 0; j < CurrChemin[i][t].size(); j++){
                     if(i!=CurrChemin[i][t][j])
                         totalwork+=Inst.dist[i][CurrChemin[i][t][j]];
+                    assert(Inst.dist[i][CurrChemin[i][t][j]] <= 42);
                 }
             }else
                 assert(CurrWork[i][t]==0);
@@ -424,7 +427,7 @@ int FindUpper(MyInstance Inst){
             }
         }
     }
-    vector<int> NodeSub,dem;
+    /*vector<int> NodeSub,dem;
     IloEnv env;	
     IloModel WorkerModel(env);
     IloArray<IloArray<IloNumVar>> u(env, Inst.node);
@@ -493,9 +496,9 @@ int FindUpper(MyInstance Inst){
 
                     int tour=NodeSub.size()-1;                    
                     GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkHub,Inst.CapaHub);			
-                    /*cout<<NodeSub<<endl;
+                    cout<<NodeSub<<endl;
                     cout<<"dem "<<dem<<endl;
-                    WorkerCplex.exportModel("filework.lp");*/
+                    WorkerCplex.exportModel("filework.lp");
                     WorkerCplex.solve();
                     assert(WorkerCplex.getStatus()==IloAlgorithm::Optimal);
                     res=WorkerCplex.getObjValue();
@@ -536,7 +539,7 @@ int FindUpper(MyInstance Inst){
     }
     WorkerCplex.end();
     WorkerModel.end();
-    env.end();
+    env.end();*/
     cout<<"Heuristic Solution is "<<totalwork<<endl;
     return totalwork;
 }
