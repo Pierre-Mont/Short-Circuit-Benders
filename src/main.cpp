@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
 	int SameLB=100;
 	int ImortanceObj=1;
 	int StrenghtenFeasCut=0;
-	int FeasFirst=-1;
+	int FeasFirst=0;
 	string Output="";
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

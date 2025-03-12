@@ -780,7 +780,144 @@ void GenWorkerModel(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray
    expr.end();
 }
 
+/*void createWorkerModelFeas(IloEnv& env, IloModel& workerModel,vector<int> NodeSub, IloArray<IloArray<IloNumVar>>& u,IloArray<IloArray<IloArray<IloBoolVar>>>& x, int MaxTour) {
+	
+	cout<<"begin create "<<endl;
+	cout<<NodeSub<<endl;
+	int NbNode= (int) NodeSub.size();
+	for (int i = 0; i < NbNode; ++i) {
+		u[NodeSub[i]] = IloArray<IloNumVar>(env, MaxTour);
+		for (int r = 0; r < MaxTour; ++r) {
+			std::ostringstream varName;
+			varName << "u_" << NodeSub[i] << "_" << r;
+			u[NodeSub[i]][r] = IloNumVar(env, 0, NbNode, ILOINT, varName.str().c_str());
+		}
+	}
+	cout<<"u  "<<endl;
+	// Define the binary variables x[i, j, r]
+	for (int i = 0; i <NbNode; ++i) {
+		x[NodeSub[i]] = IloArray<IloArray<IloBoolVar>>(env, NbNode);
+		for (int j = 0; j < NbNode; ++j) {
+			cout<<"i "<<i<<" "<<j<<endl;
+			if(i!=j){
+				cout<<NodeSub[i]<<" "<<NodeSub[j]<<endl;
+				x[NodeSub[i]][NodeSub[j]] = IloArray<IloBoolVar>(env, MaxTour);
+				for (int r = 0; r < MaxTour; ++r) {
+					std::ostringstream varName;
+					varName << "x_" << NodeSub[i] << "_" << NodeSub[j] << "_" << r;
+					cout<<r<<endl;
+					x[NodeSub[i]][NodeSub[j]][r] = IloBoolVar(env, varName.str().c_str());
+					cout<<x[NodeSub[i]][NodeSub[j]][r]<<endl;
+				}
+			}
+		}
+	}
+	cout<<"enf created "<<endl;
+}*/
+void createWorkerModelFeas(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray<IloArray<IloNumVar>>& u,IloArray<IloArray<IloArray<IloBoolVar>>>& x) {
 
+	
+	for (int i = 0; i < Inst.node; ++i) {
+		u[i] = IloArray<IloNumVar>(env, Inst.TourHub);
+		for (int r = 0; r < Inst.TourHub; ++r) {
+			std::ostringstream varName;
+			varName << "u_" << i << "_" << r;
+			u[i][r] = IloNumVar(env, 0, Inst.node, ILOINT, varName.str().c_str());
+		}
+	}
+
+	// Define the binary variables x[i, j, r]
+	for (int i = 0; i < Inst.node; ++i) {
+		x[i] = IloArray<IloArray<IloBoolVar>>(env, Inst.node);
+		for (int j = 0; j < Inst.node; ++j) {
+			if(i!=j){
+				x[i][j] = IloArray<IloBoolVar>(env, Inst.TourHub);
+				for (int r = 0; r < Inst.TourHub; ++r) {
+					std::ostringstream varName;
+					varName << "x_" << i << "_" << j << "_" << r;
+					x[i][j][r] = IloBoolVar(env, varName.str().c_str());
+				}
+			}
+		}
+	}
+}
+void GenWorkerModelFeas(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray<IloArray<IloNumVar>>& u,IloArray<IloArray<IloArray<IloBoolVar>>>& x, vector<int> NodeSub, vector<int> dem, int MaxTour, int MaxWork,int MaxCap) {
+	IloConstraintArray cons(workerModel.getEnv());
+	for (IloModel::Iterator it(workerModel); it.ok(); ++it) {
+		if ( (*it).isConstraint() )
+			cons.add((*it).asConstraint());
+		}
+		workerModel.remove(cons);
+	cons.endElements();
+	cons.end();
+	int NbNode= (int) NodeSub.size();
+	IloExpr expr(env);
+	for (int j = 1; j < NbNode; ++j) {   
+		expr.clear();
+		if(dem[NodeSub[j]]>0){
+			for (int i = 0; i < NbNode; ++i) {
+				if (i != j) {
+					for (int r = 0; r < MaxTour; ++r) {
+						expr += x[NodeSub[i]][NodeSub[j]][r];
+					}	
+				}
+			}
+			workerModel.add(expr == 1);
+		}
+	}
+
+	IloExpr flowdepot_in(env);
+	for (int i = 0; i < NbNode; ++i) {
+		if(i==0 || dem[NodeSub[i]]>0){
+			for (int r = 0; r < MaxTour; ++r) {
+				expr.clear();
+				flowdepot_in.clear();
+				for (int j = 0; j < NbNode; ++j) {
+					if (i != j && (j==0 || dem[NodeSub[j]]>0)) {
+						expr += x[NodeSub[i]][NodeSub[j]][r];
+						flowdepot_in += x[NodeSub[i]][NodeSub[j]][r];
+					}
+				}
+				workerModel.add(expr == flowdepot_in);
+			}
+		}
+	}
+	flowdepot_in.end();
+	for (int i = 0; i < NbNode; ++i) {
+		for (int j = 0; j < NbNode; ++j) {
+			if(NodeSub[i]!=NodeSub[j]){
+				for (int r = 0; r < MaxTour; ++r) {
+					expr += x[NodeSub[i]][NodeSub[j]][r] * Inst.dist[NodeSub[i]][NodeSub[j]];
+				}
+			}
+		}
+	}
+	workerModel.add(expr <= MaxWork);
+	expr.clear();
+	for (int i = 1; i < NbNode; ++i) {
+		for (int j = 1; j < NbNode; ++j) {
+			if (i != j) {
+				for (int r = 0; r < MaxTour; ++r) {
+					workerModel.add(u[NodeSub[i]][r] - u[NodeSub[j]][r] + NbNode * x[NodeSub[i]][NodeSub[j]][r] + (NbNode - 2) * x[NodeSub[j]][NodeSub[i]][r] <= NbNode - 1);
+				}
+			}
+		}
+	}
+	
+	for (int r = 0; r < MaxTour; ++r) {
+		expr.clear();
+		for (int i = 0; i < NbNode; ++i) {
+			for (int j = 0; j < NbNode; ++j) {
+				if (i!= j) {
+					expr += x[NodeSub[i]][NodeSub[j]][r] * dem[NodeSub[j]];
+				}
+			}
+		}
+		workerModel.add(expr <= MaxCap);
+	}
+	
+	expr.end();
+}
 
 void GenWorkerModelHub(IloEnv& env, IloModel& workerModel, MyInstance Inst,IloArray<IloArray<IloNumVar>>& u,IloArray<IloArray<IloArray<IloBoolVar>>>& x, vector<int> NodeSub, vector<int> dem, int MaxTour, int MaxWork,int MaxCap) {
 	int NbNode= (int) NodeSub.size();
@@ -1114,6 +1251,82 @@ void ImprovedAddFeasCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<Il
 	}
 	expr.end();
 }
+
+vector<bool> StrengthenFeasCut(vector<int> NodeSub, MyInstance& Inst, vector<int> dem, int tour, int MaxWork,int MaxCap, bool imp, vector<array<int,3>> Commands) {
+	IloEnv env2;	
+	IloArray<IloArray<IloNumVar>> u2(env2, Inst.node);
+	IloArray<IloArray<IloArray<IloBoolVar>>> x2(env2, Inst.node);
+	IloModel WorkerModel2(env2);
+	//cout<<ProblemHubDeli[h]<<endl;
+	//cout<<DemandsProblemHubDeli[h]<<endl;
+	createWorkerModelFeas(env2, WorkerModel2,Inst,u2,x2);
+	IloCplex WorkerCplex2(WorkerModel2);
+	WorkerCplex2.setParam(IloCplex::Param::Threads, 1);
+	WorkerCplex2.setParam(IloCplex::Param::MIP::Display, 0);
+	WorkerCplex2.setParam(IloCplex::Param::TimeLimit, 5);
+	WorkerCplex2.setOut(env2.getNullStream());  // Suppress log output
+	WorkerCplex2.setWarning(env2.getNullStream());
+	WorkerCplex2.setParam(IloCplex::Param::Emphasis::MIP, IloCplex::MIPEmphasisFeasibility);
+	WorkerCplex2.setParam(IloCplex::Param::MIP::Strategy::Search, IloCplex::Traditional);
+	int currsize,start;
+	if(imp){
+		currsize=NodeSub.size();
+		start=1;
+	}
+	else{
+		currsize=Commands.size();
+		start=0;
+	}
+
+	vector<bool> MinExpl(currsize,true);
+	int randnumber=0,OldDem=0;
+	//WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
+	if(Inst.StrenghtenFeasCut==2)
+		randnumber =rand()%101;
+	if(randnumber<50){
+		for (int i = start; i < currsize; i++){
+			if(!imp)
+				dem[Commands[i][0]]-=Inst.demands[Commands[i][2]][Commands[i][1]]*Inst.Psize[Commands[i][1]];
+			else{
+				OldDem=dem[NodeSub[i]];
+				dem[NodeSub[i]]=0;
+			}
+			GenWorkerModel(env2, WorkerModel2,Inst,u2,x2,NodeSub,dem, tour,MaxWork,MaxCap);
+			WorkerCplex2.solve();
+			if(WorkerCplex2.getStatus()==IloAlgorithm::Infeasible){
+				MinExpl[i]=false;
+			}else{
+				if(!imp)
+					dem[Commands[i][0]]+=Inst.demands[Commands[i][2]][Commands[i][1]]*Inst.Psize[Commands[i][1]];
+				else
+					dem[NodeSub[i]]=OldDem;
+			}
+		}
+	}else{
+		for (int i =  currsize; i > 0; i--){
+			if(!imp)
+				dem[Commands[i][0]]-=Inst.demands[Commands[i][2]][Commands[i][1]]*Inst.Psize[Commands[i][1]];
+			else{
+				OldDem=dem[NodeSub[i]];
+				dem[NodeSub[i]]=0;
+			}
+			GenWorkerModel(env2, WorkerModel2,Inst,u2,x2,NodeSub,dem, tour,MaxWork,MaxCap);
+			WorkerCplex2.solve();
+			if(WorkerCplex2.getStatus()==IloAlgorithm::Infeasible){
+				MinExpl[i]=false;
+			}else{
+				if(!imp)
+					dem[Commands[i][0]]+=Inst.demands[Commands[i][2]][Commands[i][1]]*Inst.Psize[Commands[i][1]];
+				else
+					dem[NodeSub[i]]=OldDem;
+			}
+		}
+	}
+	WorkerCplex2.end();	
+	WorkerModel2.end();
+	env2.end();
+	return MinExpl;
+}
 void AddOptCut(IloEnv& env, MyInstance& Inst, int currnode, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>> w,  IloArray<IloArray<IloNumVar>>& sigma, float Opt, vector<array<int,3>> Var, vector<array<int,3>> Var2, IloConstraintArray& Addcuts, int currt){
 	IloExpr expr(env);
 	float init;
@@ -1386,7 +1599,7 @@ bool AddCutsFromHub(IloEnv& env, MyInstance& Inst, IloArray<IloArray<IloArray<Il
 			for (size_t j = i+1; j < TourPick.size(); j++){
 				for (size_t k = 0; k < TourPick[i].size(); k++){
 					for (size_t k2 = 0; k2 < TourPick[j].size(); k2++){
-						if(ProblemHubPick[TourPick[i][k]]==ProblemHubPick[TourPick[j][k2]])
+						//if(ProblemHubPick[TourPick[i][k]]==ProblemHubPick[TourPick[j][k2]])
 							ConfPick.push_back({i,j});
 					}
 				}
@@ -1397,7 +1610,7 @@ bool AddCutsFromHub(IloEnv& env, MyInstance& Inst, IloArray<IloArray<IloArray<Il
 			for (size_t j = i+1; j < TourDeli.size(); j++){
 				for (size_t k = 0; k < TourDeli[i].size(); k++){
 					for (size_t k2 = 0; k2 < TourDeli[j].size(); k2++){
-						if(ProblemHubDeli[TourDeli[i][k]]==ProblemHubDeli[TourDeli[j][k2]])
+						//if(ProblemHubDeli[TourDeli[i][k]]==ProblemHubDeli[TourDeli[j][k2]])
 							ConfDeli.push_back({i,j});
 					}
 				}
@@ -1722,24 +1935,26 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								}
 								
 								if(NodeSub.size()>7){
+									IloEnv env2;	
+									IloArray<IloArray<IloNumVar>> u2(env2, Inst.node);
+									IloArray<IloArray<IloArray<IloBoolVar>>> x2(env2, Inst.node);
+									IloModel WorkerModel2(env2);
+									//cout<<ProblemHubDeli[h]<<endl;
+									//cout<<DemandsProblemHubDeli[h]<<endl;
+									createWorkerModelFeas(env2, WorkerModel2,Inst,u2,x2);
+									IloCplex WorkerCplex2(WorkerModel2);
+									WorkerCplex2.setParam(IloCplex::Param::Threads, 1);
+									WorkerCplex2.setParam(IloCplex::Param::MIP::Display, 0);
+									WorkerCplex2.setParam(IloCplex::Param::TimeLimit, 5);
+									WorkerCplex2.setOut(env2.getNullStream());  // Suppress log output
+									WorkerCplex2.setWarning(env2.getNullStream());
+									WorkerCplex2.setParam(IloCplex::Param::Emphasis::MIP, IloCplex::MIPEmphasisFeasibility);
+									WorkerCplex2.setParam(IloCplex::Param::MIP::Strategy::Search, IloCplex::Traditional);
 
-									GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-									WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
-
-									WorkerCplex.setParam(IloCplex::Param::TimeLimit, 10);
-									WorkerCplex.solve();
-									WorkerCplex.setParam(IloCplex::Param::TimeLimit, 1800);
-									WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 100);
-									if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
-										res[s]=WorkerCplex.getObjValue();
-										
-										upper+=res[s];
-										if(Inst.YannickT>=1 && Inst.StartVehicle[v]>=Inst.Np && NodeSub.size()>1 ){
-											resHub[Inst.StartVehicle[v]-Inst.Np]+=res[s];
-										}
-										
-										tot+=res[s];
-									}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
+									GenWorkerModel(env2, WorkerModel2,Inst,u2,x2,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
+									
+									WorkerCplex2.solve();
+									if(WorkerCplex2.getStatus()==IloAlgorithm::Infeasible){
 										res[s]=-1;
 										
 										upper+=10000;
@@ -1764,7 +1979,8 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 									}
 									assert(demandbap[0]==0);
 									pair<float,vector<vector<int>>> ResTour;
-									ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap,DistDepot);
+									vector<pair<int,vector<int>>> Resultat;
+									ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap,DistDepot,Resultat);
 									res[s]=ResTour.first;
 									if(res[s]> Inst.WorkVehicle[v] && Inst.NoMaxWork==0)
 										res[s]=-1;
@@ -1813,7 +2029,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 							MoreThanOneTour=true;
 						if(s==0 && TotalDem.second>Inst.CapaVehicle[v])
 							MoreThanOneTour=true;
-						if(MoreThanOneTour  && Inst.AddImprove>=1){
+						if(MoreThanOneTour  && Inst.AddImprove>=1 && Inst.FeasFirst<1){
 							vector<int> dem2;
 							for (size_t i = 0; i < dem.size(); i++){
 								dem2.push_back(1);
@@ -1860,47 +2076,18 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								resV2[s]=0;
 							}
 						}
-						if(res[s]==-1){
+						if(res[s]==-1){							
 							if(s==1){
 								if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v]){
-									cout<<"akoakeokaoe "<<endl;
 									if(Inst.StrenghtenFeasCut==0){
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,{},AddCuts,t);
 									}else{
-										vector<bool> MinExpl(VarPick.size(),true);
-										int randnumber=0;
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
-										if(Inst.StrenghtenFeasCut==2)
-											randnumber =rand()%101;
-										if(randnumber<50){
-											for (size_t i = 0; i < VarPick.size(); i++){
-												dem[VarPick[i][0]]-=Inst.demands[VarPick[i][2]][VarPick[i][1]]*Inst.Psize[VarPick[i][1]];
-												assert(dem[VarPick[i][0]]>=0);
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[VarPick[i][0]]+=Inst.demands[VarPick[i][2]][VarPick[i][1]]*Inst.Psize[VarPick[i][1]];	
-											}
-										}else{
-											for (size_t i =  NodeSub.size()-1; i > 0; i--){
-												dem[VarPick[i][0]]-=Inst.demands[VarPick[i][2]][VarPick[i][1]]*Inst.Psize[VarPick[i][1]];
-												assert(dem[VarPick[i][0]]>=0);
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[VarPick[i][0]]+=Inst.demands[VarPick[i][2]][VarPick[i][1]]*Inst.Psize[VarPick[i][1]];	
-											}
-										}
-										vector<array<int,3>> MinSet;
+										vector<bool> MinExpl = StrengthenFeasCut(NodeSub,Inst,dem,tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v],false,VarPick);
+										vector<array<int,3>> MinSet ;
 										for (size_t i = 0; i < VarPick.size(); i++){
 											if(MinExpl[i])
 												MinSet.push_back(VarPick[i]);
 										}
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 100);
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,MinSet,{},AddCuts,t);
 									}
 								}else{
@@ -1908,45 +2095,12 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,{},AddCuts,t,yr);
 									}
 									else{
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
-
-										assert(NodeSub.size()==PickAndDel.first.size());
-										vector<bool> MinExpl(NodeSub.size(),true);
-										int OldDem;
-										int randnumber=0;
-										if(Inst.StrenghtenFeasCut==2)
-											randnumber =rand()%101;
-										if(randnumber<50){
-											for (size_t i = 1; i < NodeSub.size(); i++){
-												OldDem=dem[NodeSub[i]];
-												dem[NodeSub[i]]=0;
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[NodeSub[i]]=OldDem;
-											}
-										}else{
-											for (size_t i =  NodeSub.size()-1; i > 0; i--){
-												OldDem=dem[NodeSub[i]];
-												dem[NodeSub[i]]=0;
-												
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[NodeSub[i]]=OldDem;
-													
-											}
-										}
+										vector<bool> MinExpl = StrengthenFeasCut(NodeSub,Inst,dem,tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v],true,{});
 										vector<int> MinSet;
 										for (size_t i = 0; i < PickAndDel.first.size(); i++){
 											if(MinExpl[i])
 												MinSet.push_back(PickAndDel.first[i]);
 										}
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 100);
 										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,MinSet,{},AddCuts,t,yr);
 									}
 								}
@@ -1957,89 +2111,31 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 									if(Inst.StrenghtenFeasCut==0){
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarDeli,{},AddCuts,t);
 									}else{
-										vector<bool> MinExpl(VarDeli.size(),true);
-										int randnumber=0;
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
-										if(Inst.StrenghtenFeasCut==2)
-											randnumber =rand()%101;
-										if(randnumber<50){
-											for (size_t i = 0; i < VarDeli.size(); i++){
-												dem[VarDeli[i][0]]-=Inst.demands[VarDeli[i][2]][VarDeli[i][1]]*Inst.Psize[VarDeli[i][1]];
-												assert(dem[VarDeli[i][0]]>=0);
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[VarDeli[i][0]]+=Inst.demands[VarDeli[i][2]][VarDeli[i][1]]*Inst.Psize[VarDeli[i][1]];	
-											}
-										}else{
-											for (size_t i =  NodeSub.size()-1; i > 0; i--){
-												dem[VarDeli[i][0]]-=Inst.demands[VarDeli[i][2]][VarDeli[i][1]]*Inst.Psize[VarDeli[i][1]];
-												assert(dem[VarDeli[i][0]]>=0);
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[VarDeli[i][0]]+=Inst.demands[VarDeli[i][2]][VarDeli[i][1]]*Inst.Psize[VarDeli[i][1]];	
-											}
-										}
-										vector<array<int,3>> MinSet;
+										vector<bool> MinExpl = StrengthenFeasCut(NodeSub,Inst,dem,tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v],false,VarDeli);
+										vector<array<int,3>> MinSet ;
 										for (size_t i = 0; i < VarDeli.size(); i++){
 											if(MinExpl[i])
 												MinSet.push_back(VarDeli[i]);
 										}
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 100);
 										AddFeasCut(env,Inst,Inst.StartVehicle[v],w,MinSet,{},AddCuts,t);
 									}
 								}else{
 									if(Inst.StrenghtenFeasCut==0){
 										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.second,{},AddCuts,t,yr);
 									}else{
-										assert(NodeSub.size()==PickAndDel.second.size());
-										vector<bool> MinExpl(NodeSub.size(),true);
-										int OldDem;
-										int randnumber=0;
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 1);
-										if(Inst.StrenghtenFeasCut==2)
-											randnumber =rand()%101;
-										if(randnumber<50){
-											for (size_t i = 1; i < NodeSub.size(); i++){
-												OldDem=dem[NodeSub[i]];
-												dem[NodeSub[i]]=0;
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[NodeSub[i]]=OldDem;
-											}
-										}else{
-											for (size_t i =  NodeSub.size()-1; i > 0; i--){
-												OldDem=dem[NodeSub[i]];
-												dem[NodeSub[i]]=0;
-												GenWorkerModel(env, WorkerModel,Inst,u,x,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
-												WorkerCplex.solve();
-												if( WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
-													MinExpl[i]=false;
-												}else
-													dem[NodeSub[i]]=OldDem;;
-											}
-										}
+										vector<bool> MinExpl = StrengthenFeasCut(NodeSub,Inst,dem,tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v],true,{});
 										vector<int> MinSet;
 										for (size_t i = 0; i < PickAndDel.second.size(); i++){
 											if(MinExpl[i])
 												MinSet.push_back(PickAndDel.second[i]);
 										}
-										WorkerCplex.setParam(IloCplex::Param::MIP::Limits::Solutions, 100);
 										ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,MinSet,{},AddCuts,t,yr);
 									}
-								}
 								if(Inst.MoreCuts==1)
 										AddMoreFeasCut(env,Inst,Inst.StartVehicle[v],w,{},VarDeli,AddCuts);
 							}
 							res[s]=0;
+							}
 						}
 					}
 				}
@@ -2062,11 +2158,11 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 						//cout<<"tot "<<tot<<" "<<Inst.WorkVehicle[v]<<endl;
 						if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v]){
 							AddFeasCut(env,Inst,Inst.StartVehicle[v],w,VarPick,VarDeli,AddCuts,t);
-							if(Inst.FeasFirst!=1)
+							if(Inst.FeasFirst<1)
 								AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts,t);
 						}else{
 							ImprovedAddFeasCut(env,Inst,Inst.StartVehicle[v],y,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
-							if(Inst.FeasFirst!=1)	
+							if(Inst.FeasFirst<1)	
 								AddImprovedProdOptCut(env,Inst,Inst.StartVehicle[v],y,sigma,tot,PickAndDel.first,PickAndDel.second,AddCuts,t,yr);
 						}
 						if(Inst.MoreCuts==1){
@@ -2089,7 +2185,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 									AddMoreOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,res[0],{},VarDeli,AddCuts);
 							}
 						}
-					}else if(Inst.FeasFirst!=1 && ((sol==-1 && tot>MasterCplex.getValue(sigma[t][v])+epsi) || (sol!=-1 && tot>MasterCplex.getValue(sigma[t][v],sol)+epsi))){
+					}else if(Inst.FeasFirst<1 && ((sol==-1 && tot>MasterCplex.getValue(sigma[t][v])+epsi) || (sol!=-1 && tot>MasterCplex.getValue(sigma[t][v],sol)+epsi))){
 						if(Inst.ImprovedCut==0 || TotalDem.first>Inst.CapaVehicle[v] || TotalDem.second > Inst.CapaVehicle[v])
 							AddOptCut(env,Inst,Inst.StartVehicle[v],w,sigma,tot,VarPick,VarDeli,AddCuts,t);
 						else
@@ -2127,7 +2223,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 			}
 		}
 				  
-		if(Inst.YannickT>=1 && Inst.FeasFirst==0 && (Inst.MoreSol==1 || MasterCplex.getObjValue()== MasterCplex.getObjValue(sol))){
+		if(Inst.YannickT>=1 && Inst.FeasFirst<1 && (Inst.YannickT==5 ||Inst.MoreSol==1 || MasterCplex.getObjValue()== MasterCplex.getObjValue(sol))){
 			int opt1,opt2, SigmaHub;
 			vector<int> TourCostPick,TourCostDeli;
 			vector<vector<int>> TourPick, TourDeli;
@@ -2135,10 +2231,10 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 			for (int h = 0; h < Inst.Nh; h++){
 				opt1=0;
 				opt2=0;
-				TourPick={{}};
-				TourDeli={{}};
-				TourCostPick={0};
-				TourCostDeli={0};
+				TourPick={};
+				TourDeli={};
+				TourCostPick={};
+				TourCostDeli={};
 				SigmaHub=0;
 				for (size_t v = 0; v < Inst.Vehicles[Inst.Np+h].size(); v++){
 					if(sol==-1){
@@ -2169,49 +2265,105 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 							if(Inst.Bapcod>=1){
 								#ifdef USE_BAP
 
-								vrpstw::Loader loader;
-								BcInitialisation bapcodInit(Inst.configFile);
-								vector<int> xCoord,yCoord,demandbap,DistDepot;
-								for (int i = 0; i < (int) ProblemHubDeli[h].size(); i++)
-								{
-									xCoord.push_back(Inst.x_all[ProblemHubDeli[h][i]]);
-									yCoord.push_back(Inst.y_all[ProblemHubDeli[h][i]]);
-									demandbap.push_back(DemandsProblemHubDeli[h][i]);
-									DistDepot.push_back(Inst.dist[Inst.Np+h][ProblemHubDeli[h][i]]);
-								}
-								assert(demandbap[0]==0);
-								/*cout<<"DELIVERY PROBLEM"<<tour<<endl;
-								cout<<ProblemHubDeli[h]<<endl;*/
-								pair<float,vector<vector<int>>> ResTour;	
-								ResTour=SolveWithBapcod(bapcodInit,loader,min(tour,Inst.Nvh*(Inst.Np+Inst.Nh-1)),Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot);
-								if(ResTour.first!=-1){
-										TourDeli=ResTour.second;
+									vrpstw::Loader loader;
+									BcInitialisation bapcodInit(Inst.configFile);
+									vector<int> xCoord,yCoord,demandbap,DistDepot;
+									for (int i = 0; i < (int) ProblemHubDeli[h].size(); i++)
+									{
+										xCoord.push_back(Inst.x_all[ProblemHubDeli[h][i]]);
+										yCoord.push_back(Inst.y_all[ProblemHubDeli[h][i]]);
+										demandbap.push_back(DemandsProblemHubDeli[h][i]);
+										DistDepot.push_back(Inst.dist[Inst.Np+h][ProblemHubDeli[h][i]]);
+									}
+									assert(demandbap[0]==0);
+									/*cout<<"DELIVERY PROBLEM"<<tour<<endl;
+									cout<<ProblemHubDeli[h]<<endl;
+									cout<<demandbap<<endl;*/
+									pair<float,vector<vector<int>>> ResTour;	
+									vector<pair<int,vector<int>>> Resultat;
+									ResTour=SolveWithBapcod(bapcodInit,loader,min(tour,Inst.Nvh*(Inst.Np+Inst.Nh-1)),Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot,Resultat);
+									if(ResTour.first!=-1){
 										opt1=ResTour.first;
+
+										for (size_t i = 1; i < Resultat.size(); i++){
+											TourDeli.push_back(Resultat[i].second);
+											TourDeli.back().erase(TourDeli.back().begin());
+											TourCostDeli.push_back(Resultat[i].first);
+										}
+										
+										/*TourDeli=ResTour.second;
+										
+										bool BapCodFail=false;
 										TourCostDeli={};
 										for (size_t i = 0; i < TourDeli.size(); i++){
-												TourDeli[i].pop_back();
-											TourCostDeli.push_back(0);
-											TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][0]][ProblemHubDeli[h][TourDeli[i][0]]];
-											for (size_t j = 1; j < TourDeli[i].size(); j++){
-												TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][TourDeli[i][j]]][ProblemHubDeli[h][TourDeli[i][j-1]]];
+											TourDeli[i].pop_back();
+											for (size_t j = 0; j < TourDeli[i].size(); j++){
+												for (size_t  l= 0; l < TourDeli[i].size(); l++){
+													if(l!=j && TourDeli[i][l]==TourDeli[i][j])
+														BapCodFail=true;
+												}
 											}
-									
-											TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][0]][ProblemHubDeli[h][TourDeli[i].back()]];
-										}
-								}
-								else
+											if(!BapCodFail || 1==1){
+												TourCostDeli.push_back(0);
+												TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][0]][ProblemHubDeli[h][TourDeli[i][0]]];
+												for (size_t j = 1; j < TourDeli[i].size(); j++){
+													TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][TourDeli[i][j]]][ProblemHubDeli[h][TourDeli[i][j-1]]];
+												}
+												TourCostDeli.back()+=Inst.dist[ProblemHubDeli[h][0]][ProblemHubDeli[h][TourDeli[i].back()]];
+											}else{
+												IloEnv env2;	
+												IloArray<IloArray<IloNumVar>> u2(env2, Inst.node);
+												IloArray<IloArray<IloArray<IloBoolVar>>> x2(env2, Inst.node);
+												IloModel WorkerModel2(env2);
+												//cout<<ProblemHubDeli[h]<<endl;
+												//cout<<DemandsProblemHubDeli[h]<<endl;
+												vector<int> TempProblemHubDeli;
+												vector<int> AlreadyIn;
+												TempProblemHubDeli.push_back(ProblemHubDeli[h][0]);
+												for (size_t j = 0; j < TourDeli[i].size(); j++)
+												{
+													if (std::find(AlreadyIn.begin(), AlreadyIn.end(), TourDeli[i][j]) == AlreadyIn.end()) {
+														TempProblemHubDeli.push_back(ProblemHubDeli[h][TourDeli[i][j]]); 
+														AlreadyIn.push_back(TourDeli[i][j]);
+													}
+												}
+												GenWorkerModelHub(env2, WorkerModel2,Inst,u2,x2,TempProblemHubDeli,DemandsProblemHubDeli[h], 1,Inst.WorkHub,Inst.CapaHub);
+
+												IloCplex WorkerCplex2(WorkerModel2);
+												WorkerCplex2.setParam(IloCplex::Param::Threads, 1);
+												WorkerCplex2.setParam(IloCplex::Param::MIP::Display, 0);
+												WorkerCplex2.setOut(env.getNullStream());  // Suppress log output
+												WorkerCplex2.setWarning(env.getNullStream());
+												WorkerCplex2.setParam(IloCplex::Param::TimeLimit, 5);
+												WorkerCplex2.solve();
+												assert(WorkerCplex2.getStatus() == IloAlgorithm::Optimal);
+												TourDeli[i]=AlreadyIn;
+												TourCostDeli.push_back(WorkerCplex2.getObjValue());
+												WorkerCplex2.end();
+												WorkerModel2.end();
+												env2.end();
+											}
+										}*/
+									}
+									else
 										opt1=10000;
-									
-									/*cout<<TourDeli<<endl;
+									/*cout<<opt1<<endl;
+									cout<<"TOuR DELi "<<endl;
+									cout<<TourDeli<<endl;
 									cout<<TourCostDeli<<endl;
-									cout<<opt1<<endl;*/
+									cout<<"DELI 2"<<endl;
+									cout<<TourDeli2<<endl;
+									cout<<TourCostDeli2<<endl;
+									assert(TourCostDeli2==TourCostDeli);
+									assert(TourDeli.size()==TourDeli2.size());
+									assert(std::equal(TourDeli.begin(), TourDeli.end(), TourDeli2.begin(), TourDeli2.end(),[](const auto& a, const auto& b) { return a.size() == b.size(); }));*/
 									assert(opt1==10000 || (accumulate(TourCostDeli.begin(), TourCostDeli.end(), 0)-opt1<0.1 && accumulate(TourCostDeli.begin(), TourCostDeli.end(), 0)-opt1>-0.1));								
 								#endif
 							}
 							else{
 								IloEnv env2;	
-								IloArray<IloArray<IloNumVar>> u2(env, Inst.node);
-								IloArray<IloArray<IloArray<IloBoolVar>>> x2(env, Inst.node);
+								IloArray<IloArray<IloNumVar>> u2(env2, Inst.node);
+								IloArray<IloArray<IloArray<IloBoolVar>>> x2(env2, Inst.node);
 								IloModel WorkerModel2(env2);
 								//cout<<ProblemHubDeli[h]<<endl;
 								//cout<<DemandsProblemHubDeli[h]<<endl;
@@ -2251,9 +2403,8 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 								env2.end();
 							}
 						}else{
-							assert(TourCostDeli.back()==0);
-							//TourDeli.push_back({});
-							//TourCostDeli.push_back(0);
+							TourDeli.push_back({});
+							TourCostDeli.push_back(0);
 							for (size_t i = 0; i < ceil(accumulate(DemandsProblemHubDeli[h].begin(), DemandsProblemHubDeli[h].end(), 0)/(double)Inst.CapaHub); i++){
 								TourDeli.back().push_back(1);
 								TourDeli.push_back({});
@@ -2347,13 +2498,20 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 										
 										
 										pair<float,vector<vector<int>>> ResTour;	
-										ResTour=SolveWithBapcod(bapcodInit,loader,min(tour,Inst.Nvh*(Inst.Np+Inst.Nh-1)),Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot);
+										vector<pair<int,vector<int>>> Resultat;
+										ResTour=SolveWithBapcod(bapcodInit,loader,min(tour,Inst.Nvh*(Inst.Np+Inst.Nh-1)),Inst.CapaHub,Inst.WorkHub,(int)demandbap.size(),xCoord,yCoord,demandbap,DistDepot,Resultat);
 										//cout<<ResTour.second<<" "<<ProblemHubPick[h]<<" "<<endl;
 										if(ResTour.first!=-1){
+											
 											if(Inst.YannickT==1){
-												TourPick=ResTour.second;
+												for (size_t i = 1; i < Resultat.size(); i++){
+													TourPick.push_back(Resultat[i].second);
+													TourPick.back().erase(TourPick.back().begin());
+													TourCostPick.push_back(Resultat[i].first);
+												}
+												//TourPick=ResTour.second;
 												opt2=ResTour.first;
-												TourCostPick={};
+												/*TourCostPick={};
 												for (size_t i = 0; i < TourPick.size(); i++){
 													TourPick[i].pop_back();
 													if(TourPick[i].size() > 1 && TourPick[i][0]==TourPick[i].back())
@@ -2364,12 +2522,26 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 														TourCostPick.back()+=Inst.dist[ProblemHubPick[h][TourPick[i][j]]][ProblemHubPick[h][TourPick[i][j-1]]];
 													}
 													TourCostPick.back()+=Inst.dist[ProblemHubPick[h][0]][ProblemHubPick[h][TourPick[i].back()]];
-												}
+												}*/
 											}else{
 												opt2=ResTour.first;
 												TourCostPick={};
-												TourPick={};
-												for (size_t i = 0; i < ResTour.second.size(); i++){	
+												for (size_t i = 1; i < Resultat.size(); i++){
+													TourPick.push_back({});
+													for (size_t j = 1; j < Resultat[i].second.size(); j++){
+														if(!splitted[Resultat[i].second[j]]){
+															for (size_t l = 0; l < ProblemHubPick[h].size(); l++){
+																if(ProblemHubPick[h][l]==nodeMaster[Resultat[i].second[j]]){
+																	TourPick.back().push_back(l);
+																}										
+															}
+														}else{
+															TourPick.back().push_back(posinPick[Resultat[i].second[j]]);
+														}
+													}
+													TourCostPick.push_back(Resultat[i].first);
+												}
+												/*for (size_t i = 0; i < ResTour.second.size(); i++){	
 													TourCostPick.push_back(0);
 													TourPick.push_back({});
 													if(!ResTour.second[i].empty()){
@@ -2393,20 +2565,26 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 														}
 													}
 													TourCostPick.back()+=Inst.dist[nodeMaster[0]][ProblemHubPick[h][TourPick.back().back()]];
-												}
+												}*/
 											}
 										}else
 											opt2=10000;
-										
-										/*cout<<TourPick<<endl;
+										/*cout<<"TOUR PI "<<endl;
+										cout<<TourPick<<endl;
 										cout<<TourCostPick<<endl;
 										cout<<opt2<<endl;*/
+										/*cout<<"Pick 2"<<endl;
+										cout<<TourPick2<<endl;
+										cout<<TourCostPick2<<endl;
+										assert(TourCostPick2==TourCostPick);
+										assert(TourPick.size()==TourPick2.size());
+										assert(std::equal(TourPick.begin(), TourPick.end(), TourPick2.begin(), TourPick2.end(),[](const auto& a, const auto& b) { return a.size() == b.size(); }));*/
 										assert(opt2==10000 || (accumulate(TourCostPick.begin(), TourCostPick.end(), 0)-opt2<0.1 && accumulate(TourCostPick.begin(), TourCostPick.end(), 0)-opt2>-0.1));								
 									#endif
 								}else{
 									IloEnv env2;	
-									IloArray<IloArray<IloNumVar>> u2(env, Inst.node);
-									IloArray<IloArray<IloArray<IloBoolVar>>> x2(env, Inst.node);
+									IloArray<IloArray<IloNumVar>> u2(env2, Inst.node);
+									IloArray<IloArray<IloArray<IloBoolVar>>> x2(env2, Inst.node);
 									IloModel WorkerModel2(env2);
 									/*cout<<"PICK PROBLEM"<<endl;
 									cout<<ProblemHubPick[h]<<endl;
@@ -2448,9 +2626,8 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 									env2.end();
 								}
 							}else{
-								assert(TourCostPick.back()==0);
-								//TourPick.push_back({});
-								//TourCostPick.push_back(0);
+								TourPick.push_back({});
+								TourCostPick.push_back(0);
 								for (size_t i = 0; i < ceil(accumulate(DemandsProblemHubPick[h].begin(), DemandsProblemHubPick[h].end(), 0)/(double)Inst.CapaHub); i++){
 									TourPick.back().push_back(1);
 									TourPick.push_back({});
@@ -2466,15 +2643,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 					cout<<TourCostPick<<" "<<TourPick<<endl;
 					cout<<TourCostDeli<<" "<<TourDeli<<endl;*/
 					if(opt1+opt2< resHub[h] && opt1<10000 && opt2 < 10000){
-						if(TourCostPick.back()==0){
-							TourCostPick.pop_back();
-							TourPick.pop_back();
-						}
-						if(TourCostDeli.back()==0){
-							TourDeli.pop_back();
-							TourCostDeli.pop_back();
-						}
-						
 						//cout<<opt1<<" "<<opt2<<" "<<resHub[h]<<endl;
 						/*cout<<"PickTOur "<<TourPick<<endl;
 						cout<<"Cors Tour "<<TourCostPick<<endl;
@@ -2850,6 +3018,10 @@ int mainBend(MyInstance Inst, int BestUpper)
 							upper=tempupper;
 						if(Inst.FeasFirst==1 && MasterCplex.getObjValue()== MasterCplex.getObjValue(sol) && tempupper<10000)
 							Inst.FeasFirst=0;
+						if(Inst.FeasFirst==2 && MasterCplex.getObjValue()== MasterCplex.getObjValue(sol) && tempupper<10000)
+							Inst.FeasFirst=-1;	
+						if(Inst.FeasFirst==-1 && MasterCplex.getObjValue()== MasterCplex.getObjValue(sol) && tempupper>=10000)
+							Inst.FeasFirst=2;	
 						auto endMaster = std::chrono::high_resolution_clock::now();
 						Inst.SubSolving+=endMaster-startMaster;
 						sol++;
@@ -2888,6 +3060,10 @@ int mainBend(MyInstance Inst, int BestUpper)
 					Inst.SubSolving+=endMaster-startMaster;
 					if(Inst.FeasFirst==1 && upper<10000)
 						Inst.FeasFirst=0;
+					if(Inst.FeasFirst==2 && upper<10000)
+						Inst.FeasFirst=-1;
+					if(Inst.FeasFirst==-1 && upper>=10000)
+						Inst.FeasFirst=2;
 				}
 				
 				if(Inst.WarmStart==1)
@@ -3014,6 +3190,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 				GetOut=true;
 			}if(Inst.Gap!=0 && Inst.GAP0==0 && Inst.Gap<5 && (upper - lower) / upper< Inst.GAPlist[Inst.CurrGAP]){
 				Inst.CurrGAP=Inst.CurrGAP+1;
+				sameLB=0;
 				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[Inst.CurrGAP]);
 			}else if(Inst.Gap!=0 && Inst.GAP0==0 && Inst.Gap<5 && Inst.CurrGAP!=0 && (upper - lower) / upper > Inst.GAPlist[Inst.CurrGAP-1]){
 				if(Inst.CurrGAP!=0){
@@ -3024,6 +3201,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 				if(AddCuts.getSize()==0){
 					if(Inst.CurrGAP!=(int)Inst.GAPlist.size()-1){
 						Inst.CurrGAP=Inst.CurrGAP+1;
+						sameLB=0;
 						MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::MIPGap, Inst.GAPlist[Inst.CurrGAP]);
 					}
 				}else{
@@ -3041,6 +3219,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 				}
 			}
 			MasterModel.add(AddCuts);
+			//MasterCplex.exportModel("filemas0.lp");	
 			if(Inst.AddConstraintObj==1 && BestUpperChg){
 				MasterModel.remove(ObjCtr);
 				ObjCtr.setUB(upper);
@@ -3051,6 +3230,14 @@ int mainBend(MyInstance Inst, int BestUpper)
 				ObjCtrLow.setLB(lower);
 				MasterModel.add(ObjCtrLow);
 			}
+			if(Inst.AddConstraintObj==2 && BestUpperChg){
+				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::UpperCutoff, upper);
+			}
+			if(Inst.AddObjLower==2 && BestLowerChg ){
+				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::LowerCutoff,lower);
+			}
+			
+
 			iter+=1;
       	}
 		auto end = std::chrono::high_resolution_clock::now();

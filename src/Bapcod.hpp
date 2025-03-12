@@ -11,7 +11,7 @@
 #ifndef MYBAPCOD_HPP // Start include guard
 #define MYBAPCOD_HPP
 
-pair<float,vector<vector<int>>> SolveWithBapcod(BcInitialisation& Bc,vrpstw::Loader loader,int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand, vector<int> DistDepot){
+pair<float,vector<vector<int>>> SolveWithBapcod(BcInitialisation& Bc,vrpstw::Loader loader,int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand, vector<int> DistDepot,vector<pair<int,vector<int>>>& Resultat){
 	
 	loader.loadMyVRp(maxNbVehicles, capacity, MaxWork, nbCust, xCoord, yCoord, demand,DistDepot);
 
@@ -22,7 +22,11 @@ pair<float,vector<vector<int>>> SolveWithBapcod(BcInitialisation& Bc,vrpstw::Loa
 	solution = model.solve();
     
     vector<vector<int>> SolVec;
-    SolVec=solution.GetVisitedVertices();
+    
+    //SolVec=solution.GetVisitedVertices();
+    Resultat=solution.tt();
+    
+    
 	model.clearModel();
     loader.ClearData();
 	Bc.bcReset();

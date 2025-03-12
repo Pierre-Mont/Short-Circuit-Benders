@@ -267,7 +267,7 @@ int FindUpper(MyInstance Inst){
         currC=PoolHub[i].first;
         currK=PoolHub[i].second;
         //cout<<"Consider command "<<currC<<" "<<currK<<endl;
-        assert(Inst.DeliWindowsLat[currC][currK]!=1);
+        //assert(Inst.DeliWindowsLat[currC][currK]!=1);
         InsertPick=coutInsertionsPick(Inst,currC,currK,max(Inst.DeliWindowsEar[currC][currK]-Inst.Experiation_date[currK],1)-1,Inst.DeliWindowsLat[currC][currK]-1,CurrChemin,CurrWork,CurrCapa,CurrStocks,CurrPickHub,CurrWorkHub,CurrCapaPickHub);
         InsertDeli.clear();
         for (int i = 0; i < Inst.Nh; i++){

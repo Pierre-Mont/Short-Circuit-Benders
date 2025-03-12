@@ -84,8 +84,10 @@ class MyInstance{
 		FeasFirst=FeasFirst_in;
 		if(Bapcod==1)
 			configFile="../config/bc.cfg";
-		else
+		if(Bapcod==2)
 			configFile="../config/bc2.cfg";
+		if(Bapcod==3)
+			configFile="../config/bc3.cfg";
 		if(Gap==5 || Gap==2)
 			GAPlist={0.2,0.15,0.1,0.05,0.025,0.0};
 		if(Gap==6 || Gap==3)
