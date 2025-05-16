@@ -45,6 +45,8 @@ int main(int argc, char *argv[]) {
 	int ImortanceObj=1;
 	int StrenghtenFeasCut=0;
 	int FeasFirst=0;
+	int ForceF=0;
+	int GPS=0;
 	string Output="";
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -135,6 +137,10 @@ int main(int argc, char *argv[]) {
 			StrenghtenFeasCut = std::stoi(arg.substr(5));
 		}if(arg.find("-FF=") == 0) {
 			FeasFirst = std::stoi(arg.substr(4));
+		}if(arg.find("-HF=") == 0) {
+			ForceF = std::stoi(arg.substr(4));
+		}if(arg.find("-GPS=") == 0) {
+			GPS = std::stoi(arg.substr(5));
 		}
     }
 	// Initialize data containers
@@ -149,10 +155,10 @@ int main(int argc, char *argv[]) {
 	}else{
 		MyInstance Inst;
 		
-		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0,Output,SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst);
+		Inst.fromFile(inputFile,ImprovedFeasCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,YannickT,TimeLimit,NewForm,GAP0,Output,SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst,ForceF,GPS);
 		
 		// Model the problem
-		int ub=10000;
+		int ub=1000000;
 		if(UseHeuristic>=1){
 			ub=FindUpper(Inst);
 			string ubfile = inputFile+".UB";

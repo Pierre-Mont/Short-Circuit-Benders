@@ -11,9 +11,8 @@
 #ifndef MYBAPCOD_HPP // Start include guard
 #define MYBAPCOD_HPP
 
-pair<float,vector<vector<int>>> SolveWithBapcod(BcInitialisation& Bc,vrpstw::Loader loader,int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<int> xCoord, vector<int> yCoord, vector<int> demand, vector<int> DistDepot,vector<pair<int,vector<int>>>& Resultat){
-	
-	loader.loadMyVRp(maxNbVehicles, capacity, MaxWork, nbCust, xCoord, yCoord, demand,DistDepot);
+pair<float,vector<vector<int>>> SolveWithBapcod(BcInitialisation& Bc,vrpstw::Loader loader,int maxNbVehicles, int capacity, int MaxWork, int nbCust, vector<double> xCoord, vector<double> yCoord, vector<int> demand, vector<int> DistDepot,vector<pair<int,vector<int>>>& Resultat, bool GPSCoord){
+	loader.loadMyVRp(maxNbVehicles, capacity, MaxWork, nbCust, xCoord, yCoord, demand,DistDepot,GPSCoord);
 
 	vrpstw::Model model =  vrpstw::Model(Bc);
    

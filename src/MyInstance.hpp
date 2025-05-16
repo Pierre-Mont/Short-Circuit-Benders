@@ -9,11 +9,11 @@ using namespace std;
 #define MYCLASS_HPP
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst,ForceF,TopCost,ProdMaxRange;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
-	vector<int> x_all, y_all; // x_c, y_c, x_p, y_p, x_h, y_h;
+	vector<double> x_all, y_all; // x_c, y_c, x_p, y_p, x_h, y_h;
 	vector<int>  Experiation_date, Psize,  Pplus ,Cmoins, StartVehicle, CapaVehicle, WorkVehicle, TourVehicle;
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
@@ -21,10 +21,10 @@ class MyInstance{
 	vector<float> GAPlist;
 	string configFile,Output;
 	int ImprovedCut,MoreCuts,SigmaCuts,NoMaxWork,WarmStart;
-	bool addcut;
+	bool addcut, GPS;
 	string intputFile;
-	std::chrono::duration<double> MasterSolving,SubSolving;
-	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in, string Output_in, int SameLB_in, int ImortanceObj_in, int StrenghtenFeasCut_in, int FeasFirst_in) {
+	std::chrono::duration<double> MasterSolving,SubSolving,SpendYT,REALSub,SFC,SFC2;
+	void fromFile(const std::string& inputFile_in,int ImprovedFeasCut_in, int MoreCuts_in, int SigmaCuts_in, int NoMaxWork_in, int WarmStart_in,int CapH_in, int PartialCut_in, int Bapcod_in, int FReal_in, int NoObj_in,int ToleranceOK_in,int Gap_in, int MoreZero_in, int TimeCode_in, int AddConstraintObj_in,int TestLogic_in,int SigmaUb_in, int LessCut_in, int ColdStart_in, int MoreSol_in, int AddObjLower_in, int AddImprove_in, int YannickT_in,int TimeLimit_in,int NewForm_in, int GAP0_in, string Output_in, int SameLB_in, int ImortanceObj_in, int StrenghtenFeasCut_in, int FeasFirst_in, int ForceF_in, int GPS_in) {
         ifstream file(inputFile_in);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << inputFile_in << std::endl;
@@ -32,7 +32,12 @@ class MyInstance{
 		intputFile=inputFile_in+".TC.txt";
 		std::chrono::duration<double> Temp(0.0);
 		SubSolving=Temp;
+		TopCost=1000000;
 		MasterSolving=Temp;
+		SpendYT=Temp;
+		REALSub=Temp;
+		SFC=Temp;
+		SFC2=Temp;
 		int count = 0;
 		string line;
 		NbOptCut=0;
@@ -82,6 +87,8 @@ class MyInstance{
 		StrenghtenFeasCut=StrenghtenFeasCut_in;
 		ImortanceObj=ImortanceObj_in;
 		FeasFirst=FeasFirst_in;
+		ForceF=ForceF_in;
+		
 		if(Bapcod==1)
 			configFile="../config/bc.cfg";
 		if(Bapcod==2)
@@ -186,7 +193,7 @@ class MyInstance{
 					Psize.push_back(re);	
 				}
 			}else if(count == 9){
-				int re;
+				double re;
 				for (int i = 0; i < node; i++)
 				{
 					iss >> re;
@@ -195,12 +202,19 @@ class MyInstance{
 					y_all.push_back(re);	
 				}
 			}
+			
 			count++;
 		}
 		for (int i = 0; i < Np; i++) {
 			Vehicles.push_back({i});
-			CapaVehicle.push_back(CapaProd);
-			WorkVehicle.push_back(WorkProd);
+			if((x_all[i]==0.823086506559041 && y_all[i]== -0.02711135118853424) || (x_all[i]==0.8124440996456178 && y_all[i]== -0.01768524677753334) || (x_all[i]==0.820574471619938 && y_all[i] == -0.01329993249897239)){
+			//if((x_all[i]==471594 && y_all[i]== -15534) || (x_all[i]==465496 && y_all[i]== -10133) || (x_all[i]==470155 && y_all[i]== -7620)){
+				CapaVehicle.push_back(CapaHub);
+				WorkVehicle.push_back(WorkHub);
+			}else{
+				CapaVehicle.push_back(CapaProd);
+				WorkVehicle.push_back(WorkProd);
+			}
 			StartVehicle.push_back(i);
 			TourVehicle.push_back(1);
 			Pplus.push_back(i);
@@ -226,6 +240,12 @@ class MyInstance{
 			Cmoins.push_back(i+Nc+Np+Nh);
 			PairHub.back().second=i+Nc+Np+Nh;
 		}
+		ProdMaxRange=min(42,WorkProd/2);
+		if(GPS_in==1){
+			GPS=true;
+			ProdMaxRange=100;
+		}else
+			GPS=false;
     }
 };
 #endif
