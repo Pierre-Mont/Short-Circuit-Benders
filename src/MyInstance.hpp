@@ -9,12 +9,12 @@ using namespace std;
 #define MYCLASS_HPP
 class MyInstance{
 	public:
-	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst,ForceF,TopCost,ProdMaxRange,Skip;
+	int Np, Nc, Nh, Nk, Nvh, CapaProd, WorkProd,CapaHub, WorkHub, Nt, TourHub, node, Nv, NbOptCut, NbFeasCut,NbNodeSubs,NbSolvedSubs,MaxNode,MinNode,CapH,PartialCut,Bapcod,FReal,NoObj,ToleranceOK,Gap,MoreZero,TimeCode,AddConstraintObj,TestLogic,SigmaUb,LessCut,ColdStart,MoreSol,AddObjLower,AddImprove,OccuProd,OccuHub,nbOccuProd,nbOccuHub,LengthTourProd,LengthTourHub,nbLengthTourProd,nbLengthTourHub,MaxOccuHub,MaxOccuProd,YannickT,CurrGAP,TimeLimit,NewForm, GAP0, SameLB,ImortanceObj,StrenghtenFeasCut,FeasFirst,ForceF,TopCost,Skip;
 	vector<int> MinDist;
 	vector<vector<int>> dist;
 	//For Debugging
 	vector<double> x_all, y_all; // x_c, y_c, x_p, y_p, x_h, y_h;
-	vector<int>  Experiation_date, Psize,  Pplus ,Cmoins, StartVehicle, CapaVehicle, WorkVehicle, TourVehicle;
+	vector<int>  Experiation_date, Psize,  Pplus ,Cmoins, StartVehicle, CapaVehicle, WorkVehicle, TourVehicle,ProdMaxRange;
 	vector<vector<int>> stocks, Clients ,demands, DeliWindowsEar, DeliWindowsLat,Vehicles;
 	vector<vector<bool>> Prod_av, Client_av;
 	vector<pair<int,int>> PairHub;
@@ -211,9 +211,11 @@ class MyInstance{
 			//if((x_all[i]==471594 && y_all[i]== -15534) || (x_all[i]==465496 && y_all[i]== -10133) || (x_all[i]==470155 && y_all[i]== -7620)){
 				CapaVehicle.push_back(CapaHub);
 				WorkVehicle.push_back(WorkHub);
+				ProdMaxRange.push_back(WorkHub);
 			}else{
 				CapaVehicle.push_back(CapaProd);
 				WorkVehicle.push_back(WorkProd);
+				ProdMaxRange.push_back(150);
 			}
 			StartVehicle.push_back(i);
 			TourVehicle.push_back(1);
@@ -240,10 +242,8 @@ class MyInstance{
 			Cmoins.push_back(i+Nc+Np+Nh);
 			PairHub.back().second=i+Nc+Np+Nh;
 		}
-		ProdMaxRange=min(42,WorkProd/2);
-		if(GPS_in==1){
+		if(GPS_in){
 			GPS=true;
-			ProdMaxRange=100;
 		}else
 			GPS=false;
     }

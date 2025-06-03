@@ -75,7 +75,7 @@ vector<vector<array<int,6>>> coutInsertionsPick(MyInstance Inst, int currC, int 
                             resultat[i][t][5]=-1;
                         }
                     }
-                    if(Inst.Prod_av[p][t] && Inst.dist[p][Inst.Np+i] <= 42 && CurrCapa[p][t]+Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaProd){
+                    if(Inst.Prod_av[p][t] && Inst.dist[p][Inst.Np+i] <= Inst.ProdMaxRange[p] && CurrCapa[p][t]+Inst.demands[currC][currK]*Inst.Psize[currK]<= Inst.CapaProd){
                         insert=coutInsertion(Inst,CurrChemin[p][t],i+Inst.Np+Inst.Nh+Inst.Nc);
                         if(insert.first<resultat[i][t][0] && insert.first+CurrWork[p][t]<Inst.WorkProd){
                             resultat[i][t][0]=insert.first;
@@ -146,7 +146,7 @@ int FindUpper(MyInstance Inst){
                 i=0;
                 atleastoneprod=false;
                 while(!atleastoneprod && i < Inst.Np){
-                    if(Inst.stocks[i][k] >= Inst.demands[c][k] && Inst.dist[i][c+Inst.Np+Inst.Nh]<= 42 && accumulate(Inst.Prod_av[i].begin()+Inst.DeliWindowsEar[c][k]-1, Inst.Prod_av[i].begin()+Inst.DeliWindowsLat[c][k], 0)>=1){
+                    if(Inst.stocks[i][k] >= Inst.demands[c][k] && Inst.dist[i][c+Inst.Np+Inst.Nh]<= Inst.ProdMaxRange[i] && accumulate(Inst.Prod_av[i].begin()+Inst.DeliWindowsEar[c][k]-1, Inst.Prod_av[i].begin()+Inst.DeliWindowsLat[c][k], 0)>=1){
                         atleastoneprod=true;
                     }
                     i++;
@@ -188,7 +188,7 @@ int FindUpper(MyInstance Inst){
         BestCandidate=-1;
         BestInsertion={-1,-1,1000};
         for (int j = 0; j < Inst.Np; j++){
-            if(CurrStocks[j][currK]>= Inst.demands[currC][currK] && Inst.dist[j][currC+Inst.Np+Inst.Nh]<=42 ){
+            if(CurrStocks[j][currK]>= Inst.demands[currC][currK] && Inst.dist[j][currC+Inst.Np+Inst.Nh]<=Inst.ProdMaxRange[j] ){
                 for (int k = Inst.DeliWindowsEar[currC][currK]-1; k < Inst.DeliWindowsLat[currC][currK]; k++){
                     assert(k>=0);
                     if(Inst.Prod_av[j][k] && CurrCapa[j][k]+Inst.demands[currC][currK]*Inst.Psize[currK]<=Inst.CapaProd){
@@ -405,7 +405,7 @@ int FindUpper(MyInstance Inst){
                 for (size_t j = 0; j < CurrChemin[i][t].size(); j++){
                     if(i!=CurrChemin[i][t][j])
                         totalwork+=Inst.dist[i][CurrChemin[i][t][j]];
-                    assert(Inst.dist[i][CurrChemin[i][t][j]] <= 42);
+                    assert(Inst.dist[i][CurrChemin[i][t][j]] <= Inst.ProdMaxRange[i]);
                 }
             }else
                 assert(CurrWork[i][t]==0);

@@ -542,7 +542,7 @@ void createMasterModel(IloEnv& env, IloModel& masterModel, MyInstance Inst, IloA
 		for (int i = 0; i < Inst.Np; ++i) {
 			for (int v: Inst.Vehicles[i]) {
 				for (int j : Inst.Cmoins) {
-					if((Inst.dist[i][j] > Inst.ProdMaxRange) && (Inst.x_all[i]!=0.823086506559041 || Inst.y_all[i]!= -0.02711135118853424) && (Inst.x_all[i]!=0.8124440996456178 || Inst.y_all[i]!= -0.01768524677753334) && (Inst.x_all[i]!=0.820574471619938 || Inst.y_all[i] != -0.01329993249897239)){
+					if(Inst.dist[i][j] > Inst.ProdMaxRange[i]){
 					//if((Inst.dist[i][j] > Inst.WorkVehicle[v]/2.0) && (Inst.x_all[i]!=471594 || Inst.y_all[i]!= -15534) && (Inst.x_all[i]!=465496 || Inst.y_all[i]!= -10133) && (Inst.x_all[i]!=470155 || Inst.y_all[i] != -7620)){
 	
 						for (int k = 0; k < Inst.Nk; k++){
@@ -1945,10 +1945,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 	vector<vector<int>> ProblemHubPick(Inst.Nh),ProblemHubDeli(Inst.Nh),DemandsProblemHubDeli(Inst.Nh),DemandsProblemHubPick(Inst.Nh);
 	vector<vector<array<int,3>>> VarPickHub(Inst.Nh),VarDeliHub(Inst.Nh);
 	vector<int> resHub(Inst.Nh,0);
-	if(Inst.Output!=""){
-		ofstream outFile(Inst.Output);
-		outFile.close();
-	}
 	bool optsol=false;
 	if(sol==-1 || MasterCplex.getObjValue()== MasterCplex.getObjValue(sol))
 		optsol=true;
@@ -2121,53 +2117,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 										resHub[Inst.StartVehicle[v]-Inst.Np]+=res[s];
 									}
 									tot+=res[s];
-									if(Inst.Output!=""){
-										ofstream outFile(Inst.Output, ios::app);
-										vector<pair<int,int>> Arcs;
-										for (int r = 0; r < Inst.TourVehicle[v]; ++r) {
-											Arcs.clear();
-											for (int i = 0; i < (int) NodeSub.size(); i++){
-												for (int j = 0; j < (int) NodeSub.size(); j++){
-													if (NodeSub[i] != NodeSub[j]) {
-														adjustedJ = (NodeSub[j] > NodeSub[i]) ? NodeSub[j] - 1 : NodeSub[j]; // Adjust for skipped i == j
-														index = (NodeSub[i] * (Inst.node - 1) + adjustedJ) * Inst.TourHub + r;
-						
-														//value=WorkerCplex.getValue(x[NodeSub[i]][NodeSub[j]][r]);
-														value=WorkerCplex.getValue(flatX[index]);
-														
-														if(value >1-epsi)
-															Arcs.push_back({NodeSub[i],NodeSub[j]});
-													}
-												}
-											}
-											if(!Arcs.empty()){
-												int k1,k=0;
-												int currentnode=Inst.StartVehicle[v];
-												outFile <<"Period "<<t<<" Vehicle "<<v<<endl;
-												if(currentnode< Inst.Np)
-													outFile <<"P"<<currentnode;
-												else
-													outFile <<"H"<<currentnode-Inst.Np;
-												while(k<(int) NodeSub.size()){
-													k1=0;
-													while(Arcs[k1].first != currentnode)
-														k1++;
-													if(Arcs[k1].second < Inst.Np)
-														outFile <<" P"<<Arcs[k1].second;
-													else if(Arcs[k1].second < Inst.Np+Inst.Nh)
-														outFile <<" H"<<Arcs[k1].second-Inst.Np;
-													else if(Arcs[k1].second < Inst.Np+Inst.Nh+Inst.Nc)
-														outFile <<" C"<<Arcs[k1].second-(Inst.Np+Inst.Nh);
-													else
-														outFile <<" H"<<Arcs[k1].second-(Inst.Np+Inst.Nh+Inst.Nc);
-													currentnode=Arcs[k1].second;
-													k++;
-												}
-												outFile <<endl;
-											}
-										}
-										outFile.close();
-									}
 								}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
 									res[s]=-1;
 									
@@ -2269,6 +2218,7 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 										pair<float,vector<vector<int>>> ResTour;
 										vector<pair<int,vector<int>>> Resultat;
 										ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap,DistDepot,Resultat,Inst.GPS);
+										cout<<ResTour.second<<endl;
 										res[s]=ResTour.first;
 										if(res[s]> Inst.WorkVehicle[v] && Inst.NoMaxWork==0)
 											res[s]=-1;
@@ -2966,7 +2916,7 @@ void AddSigmmaCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, Il
 					for (int c = 0; c < Inst.Nc; ++c) {
 						if(j==c+Inst.Np+Inst.Nh || (j >= Inst.Np+Inst.Nc+Inst.Nh && (i<Inst.Np || j!=Inst.PairHub[i-Inst.Np].second )) ){
 							for (int k = 0; k < Inst.Nk; ++k) {	
-								if(Inst.demands[c][k]>0 && (i >= Inst.Np || (Inst.stocks[i][k]>=Inst.demands[c][k] &&  Inst.dist[i][j]< Inst.ProdMaxRange)) && ((t >= Inst.DeliWindowsEar[c][k] -1 && t <= Inst.DeliWindowsLat[c][k]-1) || (j >= Inst.Np+Inst.Nc+Inst.Nh))){
+								if(Inst.demands[c][k]>0 && (i >= Inst.Np || (Inst.stocks[i][k]>=Inst.demands[c][k] &&  Inst.dist[i][j]< Inst.ProdMaxRange[i])) && ((t >= Inst.DeliWindowsEar[c][k] -1 && t <= Inst.DeliWindowsLat[c][k]-1) || (j >= Inst.Np+Inst.Nc+Inst.Nh))){
 									if(!AlreadyAdded){
 										AlreadyAdded=true;
 										VarPick.push_back({j,k,c});
@@ -3079,6 +3029,166 @@ void AddSigmmaCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, Il
 	}	
 }
 
+void LastSolve(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel& WorkerModel,  MyInstance& Inst,  IloArray<IloArray<IloBoolVarArray>> f, IloArray<IloArray<IloNumVarArray>> fr, IloArray<IloArray<IloArray<IloArray<IloBoolVarArray>>>> w,  IloBoolVarArray flatW, IloArray<IloArray<IloNumVar>> u, IloArray<IloArray<IloArray<IloBoolVar>>> x, IloBoolVarArray flatX){
+	double value;
+	float epsi = 1e-5;
+	int upper=0,index,adjustedJ;
+	ofstream  outFile(Inst.Output, ofstream::out | ofstream::trunc);
+	outFile<<"Assignment"<<endl;
+	for (int i = 0; i < Inst.Np; i++){
+		for (int j = 0; j < Inst.Nc; j++){
+			for (int k = 0; k < Inst.Nk; k++){
+				if(Inst.stocks[i][k]>0 && Inst.demands[j][k]>0){
+					if(Inst.FReal==0)
+						value=MasterCplex.getValue(f[i][k][j]);
+					else
+						value=MasterCplex.getValue(fr[i][k][j]);
+					if(value>1-epsi){
+						outFile<<j <<" "<<k<<" "<<i<<" "<<Inst.dist[i][j+Inst.Np+Inst.Nh]*Inst.ImortanceObj<<endl;
+						upper+=Inst.dist[i][j+Inst.Np+Inst.Nh]*Inst.ImortanceObj;
+					}
+				}
+			}
+		}
+	}
+	outFile<<"Routing"<<endl;
+	pair<vector<int>,vector<int>> PickAndDel,DemandPickAndDel(vector<int>(Inst.node,0),vector<int>(Inst.node,0));
+	vector<array<int,3>> VarPick, VarDeli;
+	pair<int,int> TotalDem;
+	vector<int> NodeSub,dem;
+	bool AlreadyAdded;
+	vector<vector<int>> ProblemHubPick(Inst.Nh),ProblemHubDeli(Inst.Nh),DemandsProblemHubDeli(Inst.Nh),DemandsProblemHubPick(Inst.Nh);
+	vector<vector<array<int,3>>> VarPickHub(Inst.Nh),VarDeliHub(Inst.Nh);
+	vector<int> resHub(Inst.Nh,0);
+	for (int t = 0; t < Inst.Nt; ++t) {
+		for (int v = 0; v < Inst.Nv; v++){
+			if(Inst.StartVehicle[v] >= Inst.Np || Inst.Prod_av[Inst.StartVehicle[v]][t]){
+				PickAndDel.first.clear();
+				PickAndDel.second.clear();
+				PickAndDel.first.push_back(Inst.StartVehicle[v]);
+				PickAndDel.second.push_back(Inst.StartVehicle[v]);
+				fill(DemandPickAndDel.first.begin(),DemandPickAndDel.first.end(),0);
+				fill(DemandPickAndDel.second.begin(),DemandPickAndDel.second.end(),0);
+				VarDeli.clear();
+				VarPick.clear();
+				TotalDem.first=0;
+				TotalDem.second=0;
+				for (int i = 0; i < Inst.node; ++i) {
+					if(i!=Inst.StartVehicle[v] && (Inst.StartVehicle[v]<Inst.Np || Inst.PairHub[Inst.StartVehicle[v]-Inst.Np].second !=i )){
+						AlreadyAdded=false;
+						for (int k = 0; k < Inst.Nk; ++k) {
+							for (int c = 0; c < Inst.Nc; ++c) {
+								index = ((((i* Inst.Nt + t) * Inst.Nv + v) * Inst.Nk + k) * Inst.Nc) + c;
+								if(Inst.demands[c][k]>0 && flatW[index].getUB()!=0){
+									if(i<Inst.Np+Inst.Nh || i > Inst.Np + Inst.Nh + Inst.Nc -1 || c==i-Inst.Np-Inst.Nh ){
+										value = MasterCplex.getValue(flatW[index]);
+										if(value>1-epsi){
+											if(i<Inst.Np + Inst.Nh){
+												if(!AlreadyAdded){
+													AlreadyAdded=true;
+													PickAndDel.first.push_back(i);
+												}
+												DemandPickAndDel.first[i]+=Inst.demands[c][k]*Inst.Psize[k];
+												VarPick.push_back({i,k,c});
+												TotalDem.first+=Inst.demands[c][k]*Inst.Psize[k];
+											}else{
+												if(!AlreadyAdded){
+													AlreadyAdded=true;
+													PickAndDel.second.push_back(i);
+												}
+												DemandPickAndDel.second[i]+=Inst.demands[c][k]*Inst.Psize[k];
+												VarDeli.push_back({i,k,c});
+												TotalDem.second+=Inst.demands[c][k]*Inst.Psize[k];
+											}
+										}
+									}
+								}
+							}
+							
+						}
+					}
+				}				
+				for (int s = 0; s < 2; s++){
+					if(s==1){
+						NodeSub=PickAndDel.first;
+						dem=DemandPickAndDel.first;
+						if(Inst.YannickT>=1 && Inst.StartVehicle[v]>=Inst.Np && NodeSub.size()>1 ){
+							for (size_t i = 0; i < VarPick.size(); i++){
+								VarPickHub[Inst.StartVehicle[v]-Inst.Np].push_back(VarPick[i]);
+							}
+						}
+					}
+					else{
+						NodeSub=PickAndDel.second;
+						dem=DemandPickAndDel.second;
+						if(Inst.YannickT>=1 && Inst.StartVehicle[v]>=Inst.Np && NodeSub.size()>1){
+							for (size_t i = 0; i < VarDeli.size(); i++){
+								VarDeliHub[Inst.StartVehicle[v]-Inst.Np].push_back(VarDeli[i]);
+							}
+						}
+					}
+					if(NodeSub.size()>1){
+						Inst.NbNodeSubs+=NodeSub.size();
+						Inst.NbSolvedSubs++;
+						if((int)NodeSub.size()> Inst.MaxNode)
+							Inst.MaxNode=NodeSub.size();
+						if((int)NodeSub.size()<Inst.MinNode)
+							Inst.MinNode=NodeSub.size();
+						int tour=1;
+						if(Inst.StartVehicle[v]>=Inst.Np){
+							tour=min(Inst.TourHub,(int)NodeSub.size());
+						}
+						GenWorkerModel(env, WorkerModel,Inst,u,x,flatX,NodeSub,dem, tour,Inst.WorkVehicle[v],Inst.CapaVehicle[v]);
+						WorkerCplex.solve();
+						if( WorkerCplex.getStatus()==IloAlgorithm::Optimal){
+							upper+=WorkerCplex.getObjValue();
+							outFile <<"Period "<<t<<" Vehicle "<<v<<" "<<WorkerCplex.getObjValue()<<endl;
+							
+							vector<pair<int,int>> Arcs;
+							for (int r = 0; r < min(tour,Inst.TourVehicle[v]); ++r) {
+								Arcs.clear();
+								for (int i = 0; i < (int) NodeSub.size(); i++){
+									for (int j = 0; j < (int) NodeSub.size(); j++){
+										if (NodeSub[i] != NodeSub[j]) {
+											adjustedJ = (NodeSub[j] > NodeSub[i]) ? NodeSub[j] - 1 : NodeSub[j]; // Adjust for skipped i == j
+											index = (NodeSub[i] * (Inst.node - 1) + adjustedJ) * Inst.TourHub + r;
+											value=WorkerCplex.getValue(flatX[index]);
+											if(value >1-epsi)
+												Arcs.push_back({NodeSub[i],NodeSub[j]});
+										}
+									}
+								}
+								if(!Arcs.empty()){
+									int k1,k=0;
+									int currentnode=Inst.StartVehicle[v];
+									
+									outFile<<currentnode<<" ";
+									while(k<(int) Arcs.size()){
+										k1=0;
+										while(Arcs[k1].first != currentnode)
+											k1++;
+										currentnode=Arcs[k1].second;
+										outFile<<currentnode<<" ";
+										k++;
+									}
+									outFile <<endl;
+								}
+							}
+							
+						}else if(WorkerCplex.getStatus()==IloAlgorithm::Infeasible){
+							outFile.close();
+							ofstream  outFile(Inst.Output, ofstream::out | ofstream::trunc);
+							outFile<<"OUTPUT FAILED"<<endl;
+						}
+					}
+				}
+				
+			}
+		}
+	}
+	outFile<<"Cost "<<upper<<endl;
+	outFile.close();
+}
 
 int mainBend(MyInstance Inst, int BestUpper)
 {
@@ -3337,7 +3447,6 @@ int mainBend(MyInstance Inst, int BestUpper)
 					if(Inst.FeasFirst==-1 && upper>=Inst.TopCost)
 						Inst.FeasFirst=2;
 				}
-				
 				if(Inst.WarmStart==1)
 					MasterCplex.getValues(solution, varsMaster);
 				if(Inst.SubSolving.count()+Inst.MasterSolving.count()>Inst.TimeLimit){
@@ -3511,23 +3620,28 @@ int mainBend(MyInstance Inst, int BestUpper)
 				}
 				Inst.ForceF=0;
 			}
-			MasterModel.add(AddCuts);
-			if(Inst.AddConstraintObj==1 && BestUpperChg){
-				MasterModel.remove(ObjCtr);
-				ObjCtr.setUB(upper);
-				MasterModel.add(ObjCtr);
+			if(!GetOut){
+				MasterModel.add(AddCuts);
+				if(Inst.AddConstraintObj==1 && BestUpperChg){
+					MasterModel.remove(ObjCtr);
+					ObjCtr.setUB(upper);
+					MasterModel.add(ObjCtr);
+				}
+				if(Inst.AddObjLower==1 && BestLowerChg ){
+					MasterModel.remove(ObjCtrLow);
+					ObjCtrLow.setLB(lower);
+					MasterModel.add(ObjCtrLow);
+				}
+				if(Inst.AddConstraintObj==2 && BestUpperChg){
+					MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::UpperCutoff, upper);
+				}
+				if(Inst.AddObjLower==2 && BestLowerChg ){
+					MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::LowerCutoff,lower);
+				}
+			}else if(Inst.Output!=""){
+				LastSolve(env, MasterCplex, WorkerCplex, WorkerModel, Inst, f, fr, w, flatW, u, x, flatX);
 			}
-			if(Inst.AddObjLower==1 && BestLowerChg ){
-				MasterModel.remove(ObjCtrLow);
-				ObjCtrLow.setLB(lower);
-				MasterModel.add(ObjCtrLow);
-			}
-			if(Inst.AddConstraintObj==2 && BestUpperChg){
-				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::UpperCutoff, upper);
-			}
-			if(Inst.AddObjLower==2 && BestLowerChg ){
-				MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::LowerCutoff,lower);
-			}
+
 			
 
 			iter+=1;
@@ -3548,11 +3662,7 @@ int mainBend(MyInstance Inst, int BestUpper)
 		cout<<"Max Node Subs "<<Inst.MaxNode<<endl;
 		cout<<"Min Node Subs "<<Inst.MinNode<<endl;
 		
-		if(Inst.Output!=""){
-			ofstream outFile(Inst.Output, ios::app);
-			outFile<<"Optimal cost "<<BestUpper<<endl;
-			outFile.close();
-		}
+		
 			
 		/*cout<<"Average Hub occupation "<<Inst.OccuHub/Inst.nbOccuHub<<endl;
 		cout<<"Average Prod occupation "<<Inst.OccuProd/Inst.nbOccuProd<<endl;*/
