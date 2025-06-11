@@ -2218,7 +2218,6 @@ int FindCuts(IloEnv& env, IloCplex& MasterCplex, IloCplex& WorkerCplex, IloModel
 										pair<float,vector<vector<int>>> ResTour;
 										vector<pair<int,vector<int>>> Resultat;
 										ResTour=SolveWithBapcod(bapcodInit,loader,tour,Inst.CapaVehicle[v],Inst.WorkVehicle[v],(int)NodeSub.size(),xCoord,yCoord,demandbap,DistDepot,Resultat,Inst.GPS);
-										cout<<ResTour.second<<endl;
 										res[s]=ResTour.first;
 										if(res[s]> Inst.WorkVehicle[v] && Inst.NoMaxWork==0)
 											res[s]=-1;
@@ -3283,6 +3282,9 @@ int mainBend(MyInstance Inst, int BestUpper)
 			MasterModel.add(ObjCtr);
 			expr.end();
 		}
+		if(Inst.AddConstraintObj==3){
+			MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::UpperCutoff, BestUpper);
+		}
 		if(Inst.AddObjLower==1){
 			IloExpr expr(env);
 			if(Inst.NoObj==0){
@@ -3639,7 +3641,15 @@ int mainBend(MyInstance Inst, int BestUpper)
 					MasterCplex.setParam(IloCplex::Param::MIP::Tolerances::LowerCutoff,lower);
 				}
 			}else if(Inst.Output!=""){
-				LastSolve(env, MasterCplex, WorkerCplex, WorkerModel, Inst, f, fr, w, flatW, u, x, flatX);
+				IloEnv env2;	
+				IloModel WorkerModel2(env2);
+				createWorkerModel(env2,WorkerModel2,Inst,u2,x2,flatX2);
+				IloCplex WorkerCplex2(WorkerModel2);
+				WorkerCplex2.setParam(IloCplex::Param::Threads, 1);
+				WorkerCplex2.setParam(IloCplex::Param::MIP::Display, 0);
+				WorkerCplex2.setOut(env.getNullStream());  // Suppress log output
+				WorkerCplex2.setWarning(env.getNullStream());
+				LastSolve(env2, MasterCplex, WorkerCplex2, WorkerModel2, Inst, f, fr, w, flatW, u2, x2, flatX2);	
 			}
 
 			

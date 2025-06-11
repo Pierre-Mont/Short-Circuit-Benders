@@ -8,7 +8,7 @@
 #include <cassert>
 #include "Bender.hpp"
 #include "Heuristic.hpp"
-
+#include "Cplex.hpp"
 int main(int argc, char *argv[]) {
     
 	// Initialize variables
@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
 	int ForceF=0;
 	bool GPS=0;
 	int Skip=0;
+	int CPLEXSOLVE=0;
 	string Output="";
 	for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -146,6 +147,10 @@ int main(int argc, char *argv[]) {
 		}if(arg.find("-SK=") == 0) {
 			Skip = std::stoi(arg.substr(4));
 		}
+		if(arg.find("-CPL")== 0){
+			CPLEXSOLVE = std::stoi(arg.substr(5));
+		}
+
     }
 	// Initialize data containers
 	// Read the file
@@ -172,7 +177,10 @@ int main(int argc, char *argv[]) {
 			myfile.close();
 
 		}
-		if(UseHeuristic!=1)
+		if(CPLEXSOLVE==1){
+			CPLEXOPTIMIZE(Inst,ub);
+		}
+		if(UseHeuristic!=1 && CPLEXSOLVE==0)
 			mainBend(Inst,ub);	
 	}
     return 0;

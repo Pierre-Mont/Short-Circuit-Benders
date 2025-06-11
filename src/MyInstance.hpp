@@ -215,7 +215,7 @@ class MyInstance{
 			}else{
 				CapaVehicle.push_back(CapaProd);
 				WorkVehicle.push_back(WorkProd);
-				ProdMaxRange.push_back(150);
+				ProdMaxRange.push_back(min(42,WorkProd/2));
 			}
 			StartVehicle.push_back(i);
 			TourVehicle.push_back(1);
