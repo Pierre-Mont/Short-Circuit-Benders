@@ -9,8 +9,41 @@
 #include "Bender.hpp"
 #include "Heuristic.hpp"
 #include "Cplex.hpp"
+
+static void printUsage(const char *prog) {
+	std::cout
+	    << "Usage: " << prog << " <instance.data> [options]\n\n"
+	    << "The instance file must be the first argument.\n\n"
+	    << "Options (NAME=value, all integer unless noted):\n"
+		<< "Most options are heuristics options, with several versions. Here is the recommanded usage: \n"
+		<< "-FR=1 -BC=2 -IC=2 -GAP=2 -MS=20 -H=2 -YT=2 -FF=1 -TL=1800 \n"
+		<< "To solve the problem using CPLEX use \n <-H=2 -CPL=1> \n"
+		<< "Here are the others options: \n"
+	    << "  -h, --help   Show this message and exit.\n"
+	    << "  -IC=[0,1,2]  Enable Improved Feasibility Cut \n   -MC=[0,1]   Attemp to generate more cuts      \n -SC=[0,1,2,3] Generate initial cuts on sigma variables\n"
+	    << "  -WS=[0,1]   WarmStart for master problem\n"
+	    << "  -BC=[0,1,2]   Bapcod (requires build with BapCod=ON)\n"
+	    << "  -FR=[0,1]  Create real variables instead of integer variables.   \n -GAP=[0,1,2,3,4,5] Control gap for master problem\n"
+	    << "  -ACO=[0,1,2,3]  Add upper bound constraint on objective function\n"
+	    << "  -ACL=[0,1] Add lower bound constraint on objective function \n"
+	    << "  -MS=k    Keep the k best solutions in the pool    \n -AI=[0,1] Attempt to add more improved cuts \n-H=[0,1,2]   Use Heuristic, 0: no heuristic, 1: compute heuristic solution and stop, 2: compute heuristic solution and continue\n"
+	    << "  -YT=[0,1,2] Attempt to reconstruct solutions from hub infeasibility    \n -TL=   TimeLimit (sec)  \n"
+	    << "  -SFC=[0,1,2]  Strenghten Feasability Cuts   \n -FF=[0,1] Generate only feasibility cuts until a solution is found\n";
+}
+
 int main(int argc, char *argv[]) {
-    
+	for (int i = 1; i < argc; ++i) {
+		std::string a = argv[i];
+		if (a == "-h" || a == "--help") {
+			printUsage(argv[0]);
+			return 0;
+		}
+	}
+	if (argc < 2) {
+		printUsage(argv[0]);
+		return EXIT_FAILURE;
+	}
+
 	// Initialize variables
 	string inputFile = argv[optind];
 

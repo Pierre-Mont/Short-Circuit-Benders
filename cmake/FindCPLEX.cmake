@@ -135,9 +135,10 @@ else()
             cplex
             HINTS ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_sles10_4.1 #unix
             ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_debian4.0_4.1 #unix
-            ${CPLEX_ROOT_DIR}/cplex/lib/x86-64_linux #unix
+            ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_linux #unix
             ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_osx #osx
             ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_darwin #osx
+            ${CPLEX_ROOT_DIR}/cplex
             ENV LIBRARY_PATH
             ENV LD_LIBRARY_PATH
             )
