@@ -1,0 +1,11 @@
+;Status;Iteration;Upper;Lower;Initial LB;Total time;Time to solve Masters;Time to solve Subs;Nb Feas cut; Nb Opt cut ; Gap
+Inst_4P_20C_2H_2PP_2Co_10.data;UNK;;3865;2320;;14376.2;;;;;0.399741
+Inst_4P_20C_2H_2PP_2Co_11.data;UNK;;3971;2280;;14373.2;;;;;0.425837
+Inst_4P_20C_2H_2PP_2Co_12.data;UNK;;3759;2513;;14381.1;;;;;0.331471
+Inst_4P_20C_2H_2PP_2Co_14.data;UNK;;4190;2341;;14386;;;;;0.441289
+Inst_4P_20C_2H_2PP_2Co_2.data;UNK;;4240;2185;;14378.4;;;;;0.48467
+Inst_4P_20C_2H_2PP_2Co_4.data;UNK;;3772;2246;;14376.2;;;;;0.40456
+Inst_4P_20C_2H_2PP_2Co_5.data;UNK;;3914;2503;;14376.8;;;;;0.360501
+Inst_4P_20C_2H_2PP_2Co_6.data;UNK;;4115;2125;;14385.1;;;;;0.483597
+Inst_4P_20C_2H_2PP_2Co_7.data;UNK;;3884;2304;;14372.9;;;;;0.406797
+Inst_4P_20C_2H_2PP_2Co_8.data;UNK;;3761;2190;;14370.2;;;;;0.417708

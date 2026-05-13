@@ -1,0 +1,11 @@
+;Status;Iteration;Upper;Lower;Initial LB;Total time;Time to solve Masters;Time to solve Subs;Nb Feas cut; Nb Opt cut ; Gap
+Inst_6P_30C_2H_2PP_3Co_10.data;UNK;;4467;1453;;14372.2;;;;;0.674726
+Inst_6P_30C_2H_2PP_3Co_12.data;UNK;;5388;1348;;14369;;;;;0.749814
+Inst_6P_30C_2H_2PP_3Co_13.data;UNK;;5333;1994;;14364.4;;;;;0.626102
+Inst_6P_30C_2H_2PP_3Co_14.data;UNK;;5410;1804;;14360.8;;;;;0.666543
+Inst_6P_30C_2H_2PP_3Co_1.data;UNK;;5096;1185;;14355.6;;;;;0.767465
+Inst_6P_30C_2H_2PP_3Co_2.data;UNK;;5515;1641;;14347.5;;;;;0.702448
+Inst_6P_30C_2H_2PP_3Co_3.data;UNK;;5419;995;;14344.9;;;;;0.816387
+Inst_6P_30C_2H_2PP_3Co_4.data;UNK;;5035;2933;;12327.4;;;;;0.417478
+Inst_6P_30C_2H_2PP_3Co_7.data;UNK;;5542;1277;;12743.3;;;;;0.769578
+Inst_6P_30C_2H_2PP_3Co_8.data;UNK;;5145;1815;;13380;;;;;0.64723

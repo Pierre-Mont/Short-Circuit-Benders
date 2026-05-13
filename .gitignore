@@ -1,6 +1,4 @@
 *.UB
-*.csv
 *.lp
 *.road.txt
-*.xlsx
 *.log
