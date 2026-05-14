@@ -1,12 +1,13 @@
 import os
-from tkinter import N
+
 import pandas as pd
 
 from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Font, PatternFill
-from pathlib import Path
+
 import copy
+from typing import NamedTuple
+
 
 def load_ub_value(folder_path, instance_name):
     """Charge la valeur UB depuis le fichier instance.UB"""
@@ -24,12 +25,407 @@ def format_pct(val):
         return val
     else:
         return int(round(val))
-def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
+
+
+# --- CSV filenames / signatures used across the workbook and LaTeX aggregation ---
+
+SOL_ALL_14400 = "Sol_All_14400.csv"
+SOL_ALL_3600 = "Sol_All_3600.csv"
+SOL_CPLEX_14400 = "Sol_CPLEX_14400.csv"
+SOL_CPLEX_3600 = "Sol_CPLEX_3600.csv"
+FF_SUFFIX_14400 = "-FF=1_-TL=14400.csv"
+CPL_MARKER_LONG_RUN = "-CPL=1_-TL=14400.csv"
+CPL_MARKER_IN_SHORT_NAME = "-CPL=1.csv"
+
+# Long heuristic run name fragment (discovery pass uses substring match)
+SHORT_HEURISTIC_RUN_TAG = (
+    "Sol-FR=1_-BC=2_-IC=2_-GAP=2_-MS=20_-SC=0_-ACO=0_-H=2_-YT=2_-"
+    "AI=0_-SFC=0_-FF=1_-TL=3601"
+)
+SHORT_HEURISTIC_RUN_FILE = SHORT_HEURISTIC_RUN_TAG + ".csv"
+
+SOL_IC_3600 = "Sol_All-IC_3600.csv"
+SOL_MS_3600 = "Sol_ALL-MS_3600.csv"
+SOL_RS_3600 = "Sol_All-RS_3600.csv"
+SOL_GAP_VARIANT_3600 = "Sol_All-GAP_3600.csv"
+SOL_FF_VARIANT_3600 = "Sol_All-FF_3600.csv"
+SOL_DEFAULT_BC1 = "Sol_Default_3600.csv"
+SOL_LEGACY_DEFAULT_BC1 = (
+    "Sol-FR=1_-BC=1_-IC=0_-GAP=0_-MS=0_-SC=0_-ACO=0_-H=0_-YT=0_-"
+    "AI=0_-SFC=0_-FF=0_-TL=3601.csv"
+)
+
+
+# Raw instance folder -> (human-readable LaTeX label, bucket 0..2 for "10 / 20 / 30 customers")
+INSTANCE_FOLDER_META = {
+    "Instance_2P_10C_2H_5PE": ("(2,10,2,5)", 0),
+    "Instance_2P_20C_2H_5PE": ("(2,20,2,5)", 1),
+    "Instance_2P_30C_2H_5PE": ("(2,30,2,5)", 2),
+    "Instance_4P_10C_2H_5PE": ("(4,10,2,5)", 0),
+    "Instance_4P_20C_2H_5PE": ("(4,20,2,5)", 1),
+    "Instance_4P_30C_2H_5PE": ("(4,30,2,5)", 2),
+    "Instance_2P_10C_1H_5PE": ("(2,10,1,5)", 0),
+    "Instance_2P_20C_1H_5PE": ("(2,20,1,5)", 1),
+    "Instance_2P_30C_1H_5PE": ("(2,30,1,5)", 2),
+    "Instance_4P_10C_1H_5PE": ("(4,10,1,5)", 0),
+    "Instance_4P_20C_1H_5PE": ("(4,20,1,5)", 1),
+    "Instance_4P_30C_1H_5PE": ("(4,30,1,5)", 2),
+    "Instance_6P_10C_1H_5PE": ("(6,10,1,5)", 0),
+    "Instance_6P_20C_1H_5PE": ("(6,20,1,5)", 1),
+    "Instance_6P_30C_1H_5PE": ("(6,30,1,5)", 2),
+    "Instance_6P_10C_2H_5PE": ("(6,10,2,5)", 0),
+    "Instance_6P_20C_2H_5PE": ("(6,20,2,5)", 1),
+    "Instance_6P_30C_2H_5PE": ("(6,30,2,5)", 2),
+    "Instance_2P_10C_1H_10PE": ("(2,10,1,10)", 0),
+    "Instance_2P_20C_1H_10PE": ("(2,20,1,10)", 1),
+    "Instance_2P_30C_1H_10PE": ("(2,30,1,10)", 2),
+    "Instance_4P_10C_1H_10PE": ("(4,10,1,10)", 0),
+    "Instance_4P_20C_1H_10PE": ("(4,20,1,10)", 1),
+    "Instance_4P_30C_1H_10PE": ("(4,30,1,10)", 2),
+    "Instance_6P_10C_1H_10PE": ("(6,10,1,10)", 0),
+    "Instance_6P_20C_1H_10PE": ("(6,20,1,10)", 1),
+    "Instance_6P_30C_1H_10PE": ("(6,30,1,10)", 2),
+    "Instance_2P_10C_2H_10PE": ("(2,10,2,10)", 0),
+    "Instance_2P_20C_2H_10PE": ("(2,20,2,10)", 1),
+    "Instance_2P_30C_2H_10PE": ("(2,30,2,10)", 2),
+    "Instance_4P_10C_2H_10PE": ("(4,10,2,10)", 0),
+    "Instance_4P_20C_2H_10PE": ("(4,20,2,10)", 1),
+    "Instance_4P_30C_2H_10PE": ("(4,30,2,10)", 2),
+    "Instance_6P_10C_2H_10PE": ("(6,10,2,10)", 0),
+    "Instance_6P_20C_2H_10PE": ("(6,20,2,10)", 1),
+    "Instance_6P_30C_2H_10PE": ("(6,30,2,10)", 2),
+}
+
+
+# Ordre fixe du parcours (cohérent avec les clés de INSTANCE_FOLDER_META)
+INSTANCE_FOLDER_ORDER = [
+    'Instance_2P_10C_1H_5PE', 'Instance_2P_20C_1H_5PE', 'Instance_2P_30C_1H_5PE',
+    'Instance_4P_10C_1H_5PE', 'Instance_4P_20C_1H_5PE', 'Instance_4P_30C_1H_5PE',
+    'Instance_6P_10C_1H_5PE', 'Instance_6P_20C_1H_5PE', 'Instance_6P_30C_1H_5PE',
+    'Instance_2P_10C_2H_5PE', 'Instance_2P_20C_2H_5PE', 'Instance_2P_30C_2H_5PE',
+    'Instance_4P_10C_2H_5PE', 'Instance_4P_20C_2H_5PE', 'Instance_4P_30C_2H_5PE',
+    'Instance_6P_10C_2H_5PE', 'Instance_6P_20C_2H_5PE', 'Instance_6P_30C_2H_5PE',
+    'Instance_2P_10C_1H_10PE', 'Instance_2P_20C_1H_10PE', 'Instance_2P_30C_1H_10PE',
+    'Instance_4P_10C_1H_10PE', 'Instance_4P_20C_1H_10PE', 'Instance_4P_30C_1H_10PE',
+    'Instance_6P_10C_1H_10PE', 'Instance_6P_20C_1H_10PE', 'Instance_6P_30C_1H_10PE',
+    'Instance_2P_10C_2H_10PE', 'Instance_2P_20C_2H_10PE', 'Instance_2P_30C_2H_10PE',
+    'Instance_4P_10C_2H_10PE', 'Instance_4P_20C_2H_10PE', 'Instance_4P_30C_2H_10PE',
+    'Instance_6P_10C_2H_10PE', 'Instance_6P_20C_2H_10PE', 'Instance_6P_30C_2H_10PE',
+]
+
+
+class SolutionCsvFilenames(NamedTuple):
+    long_ff_csv: str | None
+    short_ff_csv: str | None
+    long_cplex_csv: str | None
+    short_cplex_csv: str | None
+
+
+def _resolve_solution_csv_filenames(csv_files) -> SolutionCsvFilenames:
+    """Repère dans un dossier les CSV All/FF (court / long TL) et CPLEX associés."""
+    long_ff_csv = short_ff_csv = long_cplex_csv = short_cplex_csv = None
+    for csv_file in csv_files:
+        if _pick_ff_long_csv(csv_file):
+            long_ff_csv = csv_file
+        elif _pick_ff_short_csv(csv_file):
+            short_ff_csv = csv_file
+        if _pick_cplex_long_csv(csv_file):
+            long_cplex_csv = csv_file
+        elif _pick_cplex_short_csv(csv_file):
+            short_cplex_csv = csv_file
+    return SolutionCsvFilenames(long_ff_csv, short_ff_csv, long_cplex_csv, short_cplex_csv)
+
+
+INSTANCES_PER_BUCKET = 12  # Dossiers par bande « 10 / 20 / 30 clients » dans les tables LaTeX
+
+
+def _inject_ub_derived_columns(
+    folder_path, df, is_long_ff_tl: bool, is_short_ff_tl: bool
+):
     """
-    Reggroupe les CSV de plusieurs dossiers dans un fichier Excel.
-    Ajoute UB et Deviation pour les CSV FF=1_-TL=14400.csv
-    Compare TL=14400 vs TL=14400 pour chaque dossier ET GLOBALEMENT.
-    En plus, affiche une ligne LaTeX par dossier.
+    Construit la colonne Upper et, si pertinent, UB / déviation % / gap UB–Lower ;
+    mute ``df`` pour les lignes All/FF. Retourne (upper_column, +compteur UB long court).
+    """
+    ub_column = []
+    deviation_column = []
+    gap_ub_lower_column = []
+    upper_column = []
+    delta_long = delta_short = 0
+    for _, row in df.iterrows():
+        upper_value = float(row["Upper"])
+        upper_column.append(upper_value)
+        if not (is_long_ff_tl or is_short_ff_tl):
+            continue
+
+        instance_name = row.iloc[0]
+        ub_value = load_ub_value(folder_path, instance_name)
+
+        if pd.isna(ub_value):
+            ub_column.append(None)
+            deviation_column.append(None)
+            gap_ub_lower_column.append(None)
+            continue
+
+        ub_value = float(ub_value)
+
+        if upper_value < 10000 and ub_value < 10000 and upper_value != 0:
+            deviation_pct = ((ub_value - upper_value) / upper_value) * 100
+        else:
+            deviation_pct = None
+
+        ub_column.append(ub_value)
+        deviation_column.append(deviation_pct)
+
+        if ub_value is not None and not pd.isna(row["Lower"]) and ub_value < 10000:
+            lower_value = float(row["Lower"])
+            gap_ub_lower_pct = (
+                ((ub_value - lower_value) / lower_value) * 100
+                if lower_value != 0
+                else None
+            )
+        else:
+            gap_ub_lower_pct = None
+
+        gap_ub_lower_column.append(gap_ub_lower_pct)
+
+        if is_long_ff_tl and ub_value < 10000:
+            delta_long += 1
+        if is_short_ff_tl and ub_value < 10000:
+            delta_short += 1
+
+    if is_long_ff_tl or is_short_ff_tl:
+        df["UB"] = ub_column
+        df["Deviation %"] = deviation_column
+        df["Gap UB-Lower %"] = gap_ub_lower_column
+
+    return upper_column, delta_long, delta_short
+
+
+def _style_instance_sheet(ws):
+    """Accentue séparateurs, lignes Stat: et sections comparatives."""
+    for row in ws.iter_rows():
+        for cell in row:
+            val = cell.value
+            if not isinstance(val, str):
+                continue
+            if val.startswith("---"):
+                cell.font = Font(bold=True)
+            elif val.startswith("Stat:"):
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(
+                    start_color="FFFF00", end_color="FFFF00", fill_type="solid"
+                )
+            elif "RÉCAPITULATIF" in val or "COMPARAISON" in val:
+                cell.font = Font(bold=True, size=12)
+                cell.fill = PatternFill(
+                    start_color="ADD8E6", end_color="ADD8E6", fill_type="solid"
+                )
+
+
+def _append_latex_table7_aggregate_rows(
+    table: str,
+    *,
+    aver_opt_all,
+    aver_gap_all,
+    aver_ubgap_all,
+    aver_opt_ic,
+    aver_gap_ic,
+    aver_ubgpa_ic,
+    aver_opt_gap,
+    aver_gap_gap,
+    aver_ubgap_gap,
+    aver_opt_ms,
+    aver_gap_ms,
+    aver_ubgap_ms,
+    aver_opt_rs,
+    aver_gap_rs,
+    aver_ubgap_rs,
+    aver_opt_ff,
+    aver_gap_ff,
+    aver_ubgap_ff,
+    aver_opt_def,
+    aver_gap_def,
+):
+    """Ajoute les lignes d'agrégation (méthodes × trois tailles)."""
+    d = INSTANCES_PER_BUCKET
+    table += (
+        f"All & {aver_opt_all[0]} & {aver_gap_all[0]/d:.3f} & {aver_ubgap_all[0]/d:.3f} "
+        f"& {aver_opt_all[1]} & {aver_gap_all[1]/d:.3f} & {aver_ubgap_all[1]/d:.3f} "
+        f"& {aver_opt_all[2]} & {aver_gap_all[2]/d:.3f} & {aver_ubgap_all[2]/d:.3f} \\\\  \n"
+        f"IC & {aver_opt_ic[0]} & {aver_gap_ic[0]/d:.3f} & {aver_ubgpa_ic[0]/d:.3f} "
+        f"& {aver_opt_ic[1]} & {aver_gap_ic[1]/d:.3f} & {aver_ubgpa_ic[1]/d:.3f} "
+        f"& {aver_opt_ic[2]} & {aver_gap_ic[2]/d:.3f} & {aver_ubgpa_ic[2]/d:.3f} \\\\ \n"
+        f"GAP & {aver_opt_gap[0]} & {aver_gap_gap[0]/d:.3f} & {aver_ubgap_gap[0]/d:.3f} "
+        f"& {aver_opt_gap[1]} & {aver_gap_gap[1]/d:.3f} & {aver_ubgap_gap[1]/d:.3f} "
+        f"& {aver_opt_gap[2]} & {aver_gap_gap[2]/d:.3f} & {aver_ubgap_gap[2]/d:.3f} \\\\ \n"
+        f"MS & {aver_opt_ms[0]} & {aver_gap_ms[0]/d:.3f} & {aver_ubgap_ms[0]/d:.3f} "
+        f"& {aver_opt_ms[1]} & {aver_gap_ms[1]/d:.3f} & {aver_ubgap_ms[1]/d:.3f} "
+        f"& {aver_opt_ms[2]} & {aver_gap_ms[2]/d:.3f} & {aver_ubgap_ms[2]/d:.3f} \\\\ \n"
+        f"RS & {aver_opt_rs[0]} & {aver_gap_rs[0]/d:.3f} & {aver_ubgap_rs[0]/d:.3f} "
+        f"& {aver_opt_rs[1]} & {aver_gap_rs[1]/d:.3f} & {aver_ubgap_rs[1]/d:.3f} "
+        f"& {aver_opt_rs[2]} & {aver_gap_rs[2]/d:.3f} & {aver_ubgap_rs[2]/d:.3f} \\\\ \n"
+        f"FF & {aver_opt_ff[0]} & {aver_gap_ff[0]/d:.3f} & {aver_ubgap_ff[0]/d:.3f} "
+        f"& {aver_opt_ff[1]} & {aver_gap_ff[1]/d:.3f} & {aver_ubgap_ff[1]/d:.3f} "
+        f"& {aver_opt_ff[2]} & {aver_gap_ff[2]/d:.3f} & {aver_ubgap_ff[2]/d:.3f} \\\\ \n"
+        f"DEF & {aver_opt_def[0]} & {aver_gap_def[0]/d:.3f} & - & {aver_opt_def[1]} "
+        f"& {aver_gap_def[1]/d:.3f} & - & {aver_opt_def[2]} & {aver_gap_def[2]/d:.3f} & - \\\\ \\hline \n"
+        "\\end{tabular} \n\\end{table} \n"
+    )
+    return table
+
+
+def _latex_close_outer_table(fragment: str) -> str:
+    return fragment + "\\hline \n\\end{tabular} \n\\end{table} \n"
+
+
+def _build_latex_table3_runtime_totals(
+    *,
+    aver_ite10_Short,
+    aver_ite10_Long,
+    aver_ite20_Short,
+    aver_ite20_Long,
+    aver_ite30_Short,
+    aver_ite30_Long,
+    aver_MSolving10_Short,
+    aver_MSolving10_Long,
+    aver_MSolving20_Short,
+    aver_MSolving20_Long,
+    aver_MSolving30_Short,
+    aver_MSolving30_Long,
+    aver_Subsolving10_Short,
+    aver_Subsolving10_Long,
+    aver_Subsolving20_Short,
+    aver_Subsolving20_Long,
+    aver_Subsolving30_Short,
+    aver_Subsolving30_Long,
+    aver_BendersCuts10_Short,
+    aver_BendersCuts10_Long,
+    aver_BendersCuts20_Short,
+    aver_BendersCuts20_Long,
+    aver_BendersCuts30_Short,
+    aver_BendersCuts30_Long,
+) -> str:
+    d = INSTANCES_PER_BUCKET
+    t = (
+        "\\begin{table}[h!] \n \\centering \n \\setlength{\\tabcolsep}{3pt} \n \\footnotesize \n \\arrayrulecolor{black} \\\\% Bordures en bleu \n \\color{black} \n \\begin{tabular}{|c|ccc|ccc|ccc|} \n \\hline \n  &  $MILP_{1h}$    &  $LBBD_{1h}$   &  Heuristic \\\\\n Instance &  \\#Opt & \\#Feasible & $\\overline{Gap}$ & \\#Opt & \\#Feasible & $\\overline{Gap}$ &  \\#Feasible & $\\overline{Gap_{UB}}$ &  $\\overline{Gap_{LB}}$  \\\\ \\hline \n"
+    )
+    t += "\\begin{tabular}{|c|c c| c c| c c|} \n \\hline \n"
+    t += " & \\multicolumn{2}{c|}{10 customers} & \\multicolumn{2}{c|}{20 customers} & \\multicolumn{2}{c|}{30 customers} \\\\\n"
+    t += " & 1h & 4h  & 1h & 4h & 1h & 4h \\\\\n\\hline \n"
+    t += (
+        f"Average number of iterations & {aver_ite10_Short/d:.3f} & {aver_ite10_Long/d:.3f} "
+        f"& {aver_ite20_Short/d:.3f} & {aver_ite20_Long/d:.3f} & {aver_ite30_Short/d:.3f} "
+        f"& {aver_ite30_Long/d:.3f} \\\\\n"
+        f"Average master solving time (s) & {aver_MSolving10_Short/d:.3f} & {aver_MSolving10_Long/d:.3f} "
+        f"& {aver_MSolving20_Short/d:.3f} & {aver_MSolving20_Long/d:.3f} "
+        f"& {aver_MSolving30_Short/d:.3f} & {aver_MSolving30_Long/d:.3f} \\\\\n"
+        f"Average subproblem solving time (s) & {aver_Subsolving10_Short/d:.3f} "
+        f"& {aver_Subsolving10_Long/d:.3f} & {aver_Subsolving20_Short/d:.3f} "
+        f"& {aver_Subsolving20_Long/d:.3f} & {aver_Subsolving30_Short/d:.3f} "
+        f"& {aver_Subsolving30_Long/d:.3f} \\\\\n"
+        f"Average final number of benders cuts & {aver_BendersCuts10_Short/d:.3f} "
+        f"& {aver_BendersCuts10_Long/d:.3f} & {aver_BendersCuts20_Short/d:.3f} "
+        f"& {aver_BendersCuts20_Long/d:.3f} & {aver_BendersCuts30_Short/d:.3f} "
+        f"& {aver_BendersCuts30_Long/d:.3f} \\\\\n"
+        "\\hline \n\\end{tabular} \n\\end{table} \n"
+    )
+    return t
+
+
+def _pick_ff_long_csv(csv_file: str) -> bool:
+    """First pass: associate a long TL All/FF CSV with the folder (substring match)."""
+    return csv_file == SOL_ALL_14400 or FF_SUFFIX_14400 in csv_file
+
+
+def _row_is_long_ff_solution(csv_file: str) -> bool:
+    """Row processing: treat as long-horizon All/FF only on exact suffix (legacy behavior)."""
+    return csv_file == SOL_ALL_14400 or csv_file.endswith(FF_SUFFIX_14400)
+
+
+def _pick_ff_short_csv(csv_file: str) -> bool:
+    """First pass: short-horizon All/FF (substring tag in filename)."""
+    return csv_file == SOL_ALL_3600 or SHORT_HEURISTIC_RUN_TAG in csv_file
+
+
+def _row_is_short_ff_solution(csv_file: str) -> bool:
+    """Row processing: short-horizon run only if exact legacy filename suffix."""
+    return csv_file == SOL_ALL_3600 or csv_file.endswith(SHORT_HEURISTIC_RUN_FILE)
+
+
+def _pick_cplex_long_csv(csv_file: str) -> bool:
+    return csv_file == SOL_CPLEX_14400 or CPL_MARKER_LONG_RUN in csv_file
+
+
+def _pick_cplex_short_csv(csv_file: str) -> bool:
+    return csv_file == SOL_CPLEX_3600 or CPL_MARKER_IN_SHORT_NAME in csv_file
+
+
+def _mean_relative_ub_gap_pct(reference_ub: list, variant_ub: list) -> float:
+    """Average ((variant - reference) / reference) * 100 over paired rows."""
+    n = len(variant_ub)
+    if n == 0:
+        return 0.0
+    total = 0.0
+    for i in range(n):
+        total += (
+            (variant_ub[i] - reference_ub[i]) / reference_ub[i]
+        ) * 100
+    return total / n
+
+
+def _compare_ff_cpl_lowers(folder_path: str, ff_csv: str, cpl_csv: str, folder_label_for_log: str):
+    """
+    Align FF and CPLEX CSVs on the first column (instance id) and compare Lower bounds.
+    Returns (nb_instances_ff_lower_ge_cpl, mean_lb_gap_percent) or (None, None) on failure.
+    """
+    try:
+        df_ff = pd.read_csv(os.path.join(folder_path, ff_csv), delimiter=";")
+        df_cpl = pd.read_csv(os.path.join(folder_path, cpl_csv), delimiter=";")
+        inst_ff = df_ff.set_index(df_ff.columns[0])
+        inst_cpl = df_cpl.set_index(df_cpl.columns[0])
+        common_idx = inst_ff.index.intersection(inst_cpl.index)
+        lower_ff = pd.to_numeric(inst_ff.loc[common_idx, "Lower"], errors="coerce")
+        lower_cpl = pd.to_numeric(inst_cpl.loc[common_idx, "Lower"], errors="coerce")
+        nb_ff_ge_cpl = (lower_cpl.isna() | (lower_ff >= lower_cpl)).sum()
+        lb_gap_pct_series = 100 - lower_cpl * 100 / lower_ff
+        lb_gap_pct_series = lb_gap_pct_series[
+            lower_cpl.notna() & (lower_cpl != 0) & lower_ff.notna()
+        ]
+        gap_mean = (
+            lb_gap_pct_series.mean() if not lb_gap_pct_series.empty else None
+        )
+        return nb_ff_ge_cpl, gap_mean
+    except Exception as e:
+        print(f"Erreur comparaison Lower FF/CPL dans {folder_label_for_log} : {e}")
+        return None, None
+
+
+def _accum_variant_row(
+    csv_file: str,
+    target_csv: str,
+    bucket_idx: int,
+    count_opt: int,
+    mean_gap,
+    upper_column,
+    aver_opt,
+    aver_gap,
+    temp_ub_columns,
+):
+    """When csv_file matches a variant solver config, aggregate opt count, gap sum, UB column."""
+    if csv_file != target_csv:
+        return
+    aver_opt[bucket_idx] += count_opt
+    aver_gap[bucket_idx] += mean_gap
+    temp_ub_columns[bucket_idx] = upper_column
+
+
+def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
+    """Agrège les CSV de solutions par dossier d'instance vers un fichier Excel.
+
+    Étapes principales pour chaque instance (parcours dans un ordre fixe pour le LaTeX) :
+      lecture de tous les ``*.csv``, écriture d'une feuille Excel avec lignes récap ;
+      enrichissement UB / déviation / gap UB–Lower pour les runs All/FF courts et longs ;
+      cumuls pour CPLEX vs LBBD et impression des morceaux de tableaux LaTeX (tables 3–7).
     """
     meanShortCPLDiff=0
     meanLongCPLDiff=0
@@ -110,178 +506,52 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
     latex_table_4 = "\\begin{table}[h!] \n \\small \n \\centering \n \\begin{tabular}{|c|ccc|ccc|ccc|} \n \\hline \n  &  $MILP_{1h}$    &  $LBBD_{1h}$   &  Heuristic \\\\\n Instance &  \\#Opt & \\#Feasible & $\\overline{Gap}$ & \\#Opt & \\#Feasible & $\\overline{Gap}$ &  \\#Feasible & $\\overline{Gap_{UB}}$ &  $\\overline{Gap_{LB}}$  \\\\ \\hline \n"
     latex_table_7 = "\\begin{table}[h!] \n \\centering \n \\setlength{\\tabcolsep}{3pt} \n \\small \n \\arrayrulecolor{black}  % Bordures en bleu \n \\color{black} \n \\begin{tabular}{|c|ccc | ccc | ccc |} \n \\hline \n  &\\multicolumn{3}{c|}{10 customers} & \\multicolumn{3}{c|}{20 customers} & \\multicolumn{3}{c|}{30 customers} \\\\\n"
     latex_table_7+= "Method & \\#Opt & $\\overline{Gap}$ &  $\\overline{Gap_{UB}}$ &  \\#Opt  & $\\overline{Gap}$  & $\\overline{Gap_{UB}}$ &   \\#Opt & $\\overline{Gap}$ & $\\overline{Gap_{UB}}$  \\\\ \\hline \n"
-    folder_order = [
-        'Instance_2P_10C_1H_5PE', 'Instance_2P_20C_1H_5PE', 'Instance_2P_30C_1H_5PE',
-        'Instance_4P_10C_1H_5PE', 'Instance_4P_20C_1H_5PE', 'Instance_4P_30C_1H_5PE',
-        'Instance_6P_10C_1H_5PE', 'Instance_6P_20C_1H_5PE', 'Instance_6P_30C_1H_5PE',
-        'Instance_2P_10C_2H_5PE', 'Instance_2P_20C_2H_5PE', 'Instance_2P_30C_2H_5PE',
-        'Instance_4P_10C_2H_5PE', 'Instance_4P_20C_2H_5PE', 'Instance_4P_30C_2H_5PE',
-        'Instance_6P_10C_2H_5PE', 'Instance_6P_20C_2H_5PE', 'Instance_6P_30C_2H_5PE',
-        'Instance_2P_10C_1H_10PE', 'Instance_2P_20C_1H_10PE', 'Instance_2P_30C_1H_10PE',
-        'Instance_4P_10C_1H_10PE', 'Instance_4P_20C_1H_10PE', 'Instance_4P_30C_1H_10PE',
-        'Instance_6P_10C_1H_10PE', 'Instance_6P_20C_1H_10PE', 'Instance_6P_30C_1H_10PE',
-        'Instance_2P_10C_2H_10PE', 'Instance_2P_20C_2H_10PE', 'Instance_2P_30C_2H_10PE',
-        'Instance_4P_10C_2H_10PE', 'Instance_4P_20C_2H_10PE', 'Instance_4P_30C_2H_10PE',
-        'Instance_6P_10C_2H_10PE', 'Instance_6P_20C_2H_10PE', 'Instance_6P_30C_2H_10PE',
-    ]
+    if set(INSTANCE_FOLDER_ORDER) != set(INSTANCE_FOLDER_META.keys()):
+        raise ValueError(
+            "INSTANCE_FOLDER_ORDER et INSTANCE_FOLDER_META doivent décrire exactement "
+            "les mêmes dossiers."
+        )
+    variant_sheet_targets = (
+        (SOL_IC_3600, aver_opt_ic, aver_gap_ic, temp_ub_column_ic),
+        (SOL_MS_3600, aver_opt_ms, aver_gap_ms, temp_ub_column_ms),
+        (SOL_RS_3600, aver_opt_rs, aver_gap_rs, temp_ub_column_rs),
+        (SOL_GAP_VARIANT_3600, aver_opt_gap, aver_gap_gap, temp_ub_column_gap),
+        (SOL_FF_VARIANT_3600, aver_opt_ff, aver_gap_ff, temp_ub_column_ff),
+        (SOL_DEFAULT_BC1, aver_opt_def, aver_gap_def, temp_ub_column_def),
+        (
+            SOL_LEGACY_DEFAULT_BC1,
+            aver_opt_def2,
+            aver_gap_def2,
+            temp_ub_column_def2,
+        ),
+    )
 
-    # Parcourir tous les dossiers
-    for folder_name in folder_order:
-        inst10=False
-        inst20=False
-        inst30=False
-        folder_path = os.path.join(base_directory, folder_name)
-        if folder_name == "Instance_2P_10C_2H_5PE":
-            folder_name="(2,10,2,5)"
-            inst10=True
-        if folder_name == "Instance_2P_20C_2H_5PE":
-            folder_name="(2,20,2,5)"
-            inst20=True
-        if folder_name == "Instance_2P_30C_2H_5PE":
-            folder_name="(2,30,2,5)"
-            inst30=True
-        if folder_name == "Instance_4P_10C_2H_5PE":
-            folder_name="(4,10,2,5)"
-            inst10=True
-        if folder_name == "Instance_4P_20C_2H_5PE":
-            folder_name="(4,20,2,5)"
-            inst20=True
-        if folder_name == "Instance_4P_30C_2H_5PE":
-            folder_name="(4,30,2,5)"
-            inst30=True
-        if folder_name == "Instance_2P_10C_1H_5PE":
-            folder_name="(2,10,1,5)"
-            inst10=True
-        if folder_name == "Instance_2P_20C_1H_5PE":
-            folder_name="(2,20,1,5)"
-            inst20=True
-        if folder_name == "Instance_2P_30C_1H_5PE":
-            folder_name="(2,30,1,5)"
-            inst30=True
-        if folder_name == "Instance_4P_10C_1H_5PE":
-            folder_name="(4,10,1,5)"
-            inst10=True
-        if folder_name == "Instance_4P_20C_1H_5PE":
-            folder_name="(4,20,1,5)"
-            inst20=True
-        if folder_name == "Instance_4P_30C_1H_5PE":
-            folder_name="(4,30,1,5)"
-            inst30=True
-        if folder_name == "Instance_6P_10C_1H_5PE":
-            folder_name="(6,10,1,5)"
-            inst10=True
-        if folder_name == "Instance_6P_20C_1H_5PE":
-            folder_name="(6,20,1,5)"
-            inst20=True
-        if folder_name == "Instance_6P_30C_1H_5PE":
-            folder_name="(6,30,1,5)"
-            inst30=True
-        if folder_name == "Instance_6P_10C_2H_5PE":
-            folder_name="(6,10,2,5)"
-            inst10=True
-        if folder_name == "Instance_6P_20C_2H_5PE":
-            folder_name="(6,20,2,5)"
-            inst20=True
-        if folder_name == "Instance_6P_30C_2H_5PE":
-            folder_name="(6,30,2,5)"
-            inst30=True
-        if folder_name == "Instance_2P_10C_1H_10PE":
-            folder_name="(2,10,1,10)"
-            inst10=True
-        if folder_name == "Instance_2P_20C_1H_10PE":
-            folder_name="(2,20,1,10)"
-            inst20=True
-        if folder_name == "Instance_2P_30C_1H_10PE":
-            folder_name="(2,30,1,10)"
-            inst30=True
-        if folder_name == "Instance_4P_10C_1H_10PE":
-            folder_name="(4,10,1,10)"
-            inst10=True
-        if folder_name == "Instance_4P_20C_1H_10PE":
-            folder_name="(4,20,1,10)"
-            inst20=True
-        if folder_name == "Instance_4P_30C_1H_10PE":
-            folder_name="(4,30,1,10)"
-            inst30=True
-        if folder_name == "Instance_6P_10C_1H_10PE":
-            folder_name="(6,10,1,10)"
-            inst10=True
-        if folder_name == "Instance_6P_20C_1H_10PE":
-            folder_name="(6,20,1,10)"
-            inst20=True
-        if folder_name == "Instance_6P_30C_1H_10PE":
-            folder_name="(6,30,1,10)"
-            inst30=True
-        if folder_name == "Instance_2P_10C_2H_10PE":
-            folder_name="(2,10,2,10)"
-            inst10=True
-        if folder_name == "Instance_2P_20C_2H_10PE":
-            folder_name="(2,20,2,10)"
-            inst20=True
-        if folder_name == "Instance_2P_30C_2H_10PE":
-            folder_name="(2,30,2,10)"
-            inst30=True
-        if folder_name == "Instance_4P_10C_2H_10PE":
-            folder_name="(4,10,2,10)"
-            inst10=True
-        if folder_name == "Instance_4P_20C_2H_10PE":
-            folder_name="(4,20,2,10)"
-            inst20=True
-        if folder_name == "Instance_4P_30C_2H_10PE":
-            folder_name="(4,30,2,10)"
-            inst30=True
-        if folder_name == "Instance_6P_10C_2H_10PE":
-            folder_name="(6,10,2,10)"
-            inst10=True
-        if folder_name == "Instance_6P_20C_2H_10PE":
-            folder_name="(6,20,2,10)"
-            inst20=True
-        if folder_name == "Instance_6P_30C_2H_10PE":
-            folder_name="(6,30,2,10)"
-            inst30=True
+    # Parcourir tous les dossiers d'instances (ordre fixé pour les sorties LaTeX)
+    for raw_folder_name in INSTANCE_FOLDER_ORDER:
+        folder_path = os.path.join(base_directory, raw_folder_name)
+        folder_label, customer_bucket_idx = INSTANCE_FOLDER_META[raw_folder_name]
+        inst10 = customer_bucket_idx == 0
+        inst20 = customer_bucket_idx == 1
+        inst30 = customer_bucket_idx == 2
+        n = customer_bucket_idx
 
         if not os.path.isdir(folder_path):
             continue
 
-        # Chercher les fichiers spécifiques
-        csv_files = sorted([f for f in os.listdir(folder_path) if f.endswith('.csv')])
+        csv_files = sorted(f for f in os.listdir(folder_path) if f.endswith(".csv"))
+        roles = _resolve_solution_csv_filenames(csv_files)
+        long_tl_file = roles.long_ff_csv
+        short_tl_file = roles.short_ff_csv
+        longCPL_file = roles.long_cplex_csv
+        shortCPL_file = roles.short_cplex_csv
 
-        long_tl_file = None
-        short_tl_file = None
-        longCPL_file = None
-        shortCPL_file = None
-        FF0 = None
-
-        for csv_file in csv_files:
-            if (
-                csv_file == 'Sol_All_14400.csv'
-                or '-FF=1_-TL=14400.csv' in csv_file
-            ):
-                long_tl_file = csv_file
-            elif (
-                csv_file == 'Sol_All_3600.csv'
-                or 'Sol-FR=1_-BC=2_-IC=2_-GAP=2_-MS=20_-SC=0_-ACO=0_-H=2_-YT=2_-AI=0_-SFC=0_-FF=1_-TL=3601' in csv_file
-            ):
-                short_tl_file = csv_file
-
-            if (
-                csv_file == 'Sol_CPLEX_14400.csv'
-                or '-CPL=1_-TL=14400.csv' in csv_file
-            ):
-                longCPL_file = csv_file
-            elif (
-                csv_file == 'Sol_CPLEX_3600.csv'
-                or '-CPL=1.csv' in csv_file
-            ):
-                shortCPL_file = csv_file
+        folder_name = folder_label
         
         
-        # Créer feuille
         ws = wb.create_sheet(title=folder_name[:31])
         current_row = 1
         csv_stats = []
 
-        # Ces variables serviront pour la ligne LaTeX du dossier
         cpl_opt = cpl_feas = 0
         cpl_gap_avg = 0.0
         ff_opt = ff_feas = 0
@@ -303,67 +573,14 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                 print(f"Erreur en lisant {csv_path}: {e}")
                 continue
 
-            # Traiter UB et Deviation pour FF=1_-TL=14400.csv
-            is_long_ff_tl = (
-                csv_file == 'Sol_All_14400.csv'
-                or csv_file.endswith('-FF=1_-TL=14400.csv')
+            # Colonnes Upper + UB / déviation pour les fichiers All/FF (voir constantes SOL_*)
+            is_long_ff_tl = _row_is_long_ff_solution(csv_file)
+            is_short_ff_tl = _row_is_short_ff_solution(csv_file)
+            upper_column, d_ub_long, d_ub_short = _inject_ub_derived_columns(
+                folder_path, df, is_long_ff_tl, is_short_ff_tl
             )
-            is_short_ff_tl = (
-                csv_file == 'Sol_All_3600.csv'
-                or csv_file.endswith('Sol-FR=1_-BC=2_-IC=2_-GAP=2_-MS=20_-SC=0_-ACO=0_-H=2_-YT=2_-AI=0_-SFC=0_-FF=1_-TL=3601.csv')
-            )  
-    
-            ub_column = []
-            deviation_column = []
-            gap_ub_lower_column = []
-            upper_column = []
-            for _, row in df.iterrows():
-                upper_value = float(row['Upper'])
-                upper_column.append(upper_value)
-                if(is_long_ff_tl or is_short_ff_tl):
-                    instance_name = row.iloc[0]  # Première colonne = nom instance
-                    ub_value = load_ub_value(folder_path, instance_name)
-
-                    if pd.isna(ub_value):
-                        ub_column.append(None)
-                        deviation_column.append(None)
-                        gap_ub_lower_column.append(None)
-                        continue
-
-                    ub_value = float(ub_value)
-                    
-                    # Deviation % calculée seulement si upper et UB < 10000
-                    if upper_value < 10000 and ub_value < 10000 and upper_value != 0:
-                        deviation_pct = ((ub_value - upper_value) / upper_value) * 100
-                    
-                    else:
-                        deviation_pct = None
-
-                    ub_column.append(ub_value)
-                    deviation_column.append(deviation_pct)
-
-                    # Gap UB-Lower %
-                    if ub_value is not None and not pd.isna(row['Lower']) and ub_value<10000:
-                        lower_value = float(row['Lower'])
-                        if lower_value != 0:
-                            gap_ub_lower_pct = ((ub_value - lower_value) / lower_value) * 100
-                        else:
-                            gap_ub_lower_pct = None
-                    else:
-                        gap_ub_lower_pct = None
-
-                    gap_ub_lower_column.append(gap_ub_lower_pct)
-
-                
-                    if is_long_ff_tl and ub_value < 10000:
-                        ub_small_count += 1
-                    if is_short_ff_tl and ub_value < 10000:
-                        ub_small_count_short += 1
-            if(is_long_ff_tl or is_short_ff_tl):
-                # Ajouter les nouvelles colonnes au DataFrame
-                df['UB'] = ub_column
-                df['Deviation %'] = deviation_column
-                df['Gap UB-Lower %'] = gap_ub_lower_column
+            ub_small_count += d_ub_long
+            ub_small_count_short += d_ub_short
 
             if current_row > 1:
                 ws.append(["---"] * len(df.columns))
@@ -434,118 +651,11 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                 'is_long_cpl': csv_file == longCPL_file,
                 'is_short_cpl': csv_file == shortCPL_file
             })
-            if(csv_file == "Sol_All-IC_3600.csv"):
-                if(inst10):
-                    aver_opt_ic[0]+= count_opt
-                    aver_gap_ic[0]+= mean_gap
-                    temp_ub_column_ic[0]=upper_column
-                    #aver_gapUB_ic[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_ic[1]+= count_opt
-                    aver_gap_ic[1]+= mean_gap
-                    temp_ub_column_ic[1]=upper_column
-                    #aver_gapUB_ic[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_ic[2]+= count_opt
-                    aver_gap_ic[2]+= mean_gap
-                    temp_ub_column_ic[2]=upper_column
-                    #aver_gapUB_ic[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol_ALL-MS_3600.csv"):
-                if(inst10):
-                    aver_opt_ms[0]+= count_opt
-                    aver_gap_ms[0]+= mean_gap
-                    temp_ub_column_ms[0]=upper_column
-                    #aver_gapUB_ms[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_ms[1]+= count_opt
-                    aver_gap_ms[1]+= mean_gap
-                    temp_ub_column_ms[1]=upper_column
-                    #aver_gapUB_ms[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_ms[2]+= count_opt
-                    aver_gap_ms[2]+= mean_gap
-                    temp_ub_column_ms[2]=upper_column
-                    #aver_gapUB_ms[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol_All-RS_3600.csv"):
-                if(inst10):
-                    aver_opt_rs[0]+= count_opt
-                    aver_gap_rs[0]+= mean_gap
-                    temp_ub_column_rs[0]=upper_column
-                    #aver_gapUB_rs[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_rs[1]+= count_opt
-                    aver_gap_rs[1]+= mean_gap
-                    temp_ub_column_rs[1]=upper_column
-                    #aver_gapUB_rs[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_rs[2]+= count_opt
-                    aver_gap_rs[2]+= mean_gap
-                    temp_ub_column_rs[2]=upper_column
-                    #aver_gapUB_rs[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol_All-GAP_3600.csv"):
-                if(inst10):
-                    aver_opt_gap[0]+= count_opt
-                    aver_gap_gap[0]+= mean_gap
-                    temp_ub_column_gap[0]=upper_column
-                    #aver_gapUB_gap[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_gap[1]+= count_opt
-                    aver_gap_gap[1]+= mean_gap
-                    temp_ub_column_gap[1]=upper_column
-                    #aver_gapUB_gap[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_gap[2]+= count_opt
-                    aver_gap_gap[2]+= mean_gap
-                    temp_ub_column_gap[2]=upper_column
-                    #aver_gapUB_gap[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol_All-FF_3600.csv"):
-                if(inst10):
-                    aver_opt_ff[0]+= count_opt
-                    aver_gap_ff[0]+= mean_gap
-                    temp_ub_column_ff[0]=upper_column
-                    #aver_gapUB_ff[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_ff[1]+= count_opt
-                    aver_gap_ff[1]+= mean_gap
-                    temp_ub_column_ff[1]=upper_column
-                    #aver_gapUB_ff[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_ff[2]+= count_opt
-                    aver_gap_ff[2]+= mean_gap
-                    temp_ub_column_ff[2]=upper_column
-                    #aver_gapUB_ff[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol_Default_3600.csv"):
-                if(inst10):
-                    aver_opt_def[0]+= count_opt
-                    aver_gap_def[0]+= mean_gap
-                    temp_ub_column_def[0]=upper_column
-                    #aver_gapUB_def[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_def[1]+= count_opt
-                    aver_gap_def[1]+= mean_gap
-                    temp_ub_column_def[1]=upper_column
-                    #aver_gapUB_default[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_def[2]+= count_opt
-                    aver_gap_def[2]+= mean_gap
-                    temp_ub_column_def[2]=upper_column
-                    #aver_gapUB_default[2]+= mean_gap_ub_lower
-            if(csv_file == "Sol-FR=1_-BC=1_-IC=0_-GAP=0_-MS=0_-SC=0_-ACO=0_-H=0_-YT=0_-AI=0_-SFC=0_-FF=0_-TL=3601.csv"):
-                if(inst10):
-                    aver_opt_def2[0]+= count_opt
-                    aver_gap_def2[0]+= mean_gap
-                    temp_ub_column_def2[0]=upper_column
-                    #aver_gapUB_def2[0]+= mean_gap_ub_lower
-                if(inst20):
-                    aver_opt_def2[1]+= count_opt
-                    aver_gap_def2[1]+= mean_gap
-                    temp_ub_column_def2[1]=upper_column
-                    #aver_gapUB_def2[1]+= mean_gap_ub_lower
-                if(inst30):
-                    aver_opt_def2[2]+= count_opt
-                    aver_gap_def2[2]+= mean_gap
-                    temp_ub_column_def2[2]=upper_column
-                    #aver_gapUB_def2[2]+= mean_gap_ub_lower
+            for tgt, ao, ag, tu in variant_sheet_targets:
+                _accum_variant_row(
+                    csv_file, tgt, n, count_opt, mean_gap, upper_column,
+                    ao, ag, tu,
+                )
             # Remplir les stats pour la ligne LaTeX
             if csv_file == longCPL_file:
                 cpl_opt = count_opt
@@ -554,10 +664,6 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                 cpl_long_lb = df['Lower'].mean()
                 avg_GAP_CPL.append(mean_gap)
             if csv_file == long_tl_file:
-                if(folder_name=="(4,30,1,10)"):
-                    mean_gap=14.9
-                    count_opt=1
-                    count_feas=10
                 ff_opt = count_opt
                 ff_feas = count_feas
                 ff_gap_avg = mean_gap
@@ -588,10 +694,6 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                 cpl_feas_short = count_feas
                 cpl_gap_avg_short = mean_gap
             if csv_file == short_tl_file:
-                if(folder_name=="(4,30,1,10)"):
-                    mean_gap=17.5
-                    count_opt=0
-                    count_feas=10
                 avg_GAP_FF_Short.append(mean_gap)
                 ff_short_lb = df['Lower'].mean()
                 aver_ite_short+= mean_iteration
@@ -606,7 +708,7 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                     aver_MSolving10_Short+= df['Time to solve Masters'].mean()
                     aver_Subsolving10_Short+= df['Time to solve Subs'].mean()
 
-                    temp_ub_column_all[0]+=upper_column
+                    temp_ub_column_all[0]=upper_column
                     aver_gap_all[0]+=mean_gap
                     aver_opt_all[0]+=count_opt
                 if inst20:
@@ -614,7 +716,7 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                     aver_BendersCuts20_Short+= (df['Nb Feas cut'].sum()+df[' Nb Opt cut '].sum())/10
                     aver_MSolving20_Short+= df['Time to solve Masters'].mean()
                     aver_Subsolving20_Short+= df['Time to solve Subs'].mean()
-                    temp_ub_column_all[1]+=upper_column
+                    temp_ub_column_all[1]=upper_column
                     aver_gap_all[1]+=mean_gap
                     aver_opt_all[1]+=count_opt
                 if inst30:
@@ -622,64 +724,27 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
                     aver_BendersCuts30_Short+= (df['Nb Feas cut'].sum()+df[' Nb Opt cut '].sum())/10
                     aver_MSolving30_Short+= df['Time to solve Masters'].mean()
                     aver_Subsolving30_Short+= df['Time to solve Subs'].mean()
-                    temp_ub_column_all[2]+=upper_column
+                    temp_ub_column_all[2]=upper_column
                     aver_gap_all[2]+=mean_gap
                     aver_opt_all[2]+=count_opt
 
        
         if long_tl_file and longCPL_file:
-            try:
-                df_ff = pd.read_csv(os.path.join(folder_path, long_tl_file), delimiter=';')
-                df_cpl = pd.read_csv(os.path.join(folder_path, longCPL_file), delimiter=';')
-
-                # On aligne sur le nom d'instance (1ère colonne)
-                inst_ff = df_ff.set_index(df_ff.columns[0])
-                inst_cpl = df_cpl.set_index(df_cpl.columns[0])
-
-                # On ne garde que les instances communes
-                common_idx = inst_ff.index.intersection(inst_cpl.index)
-
-                lower_ff = inst_ff.loc[common_idx, 'Lower']
-                lower_cpl = inst_cpl.loc[common_idx, 'Lower']
-                lower_ff  = pd.to_numeric(inst_ff.loc[common_idx, 'Lower'], errors='coerce')
-                lower_cpl = pd.to_numeric(inst_cpl.loc[common_idx, 'Lower'], errors='coerce')
-                # Compter si Lower_CPL est vide OU si Lower_FF > Lower_CPL
-                nb_lower_ff_sup_cpl_long = (lower_cpl.isna() | (lower_ff >= lower_cpl)).sum()
-                lb_gap_pct_series = 100 - lower_cpl*100/lower_ff 
-
-                lb_gap_pct_series = lb_gap_pct_series[lower_cpl.notna() & (lower_cpl != 0) & lower_ff.notna()]
-
-                gap_lb_ff_vs_cpl_short = lb_gap_pct_series.mean() if not lb_gap_pct_series.empty else None
-                meanLongCPLDiff+= gap_lb_ff_vs_cpl_short
-            except Exception as e:
-                print(f"Erreur comparaison Lower FF/CPL dans {folder_name} : {e}")
+            nb_l, gap_m = _compare_ff_cpl_lowers(
+                folder_path, long_tl_file, longCPL_file, folder_name
+            )
+            if nb_l is not None:
+                nb_lower_ff_sup_cpl_long = nb_l
+            if gap_m is not None:
+                meanLongCPLDiff += gap_m
         if short_tl_file and shortCPL_file:
-            try:
-                df_ff = pd.read_csv(os.path.join(folder_path, short_tl_file), delimiter=';')
-                df_cpl = pd.read_csv(os.path.join(folder_path, shortCPL_file), delimiter=';')
-
-                # On aligne sur le nom d'instance (1ère colonne)
-                inst_ff = df_ff.set_index(df_ff.columns[0])
-                inst_cpl = df_cpl.set_index(df_cpl.columns[0])
-
-                # On ne garde que les instances communes
-                common_idx = inst_ff.index.intersection(inst_cpl.index)
-
-                lower_ff = inst_ff.loc[common_idx, 'Lower']
-                lower_cpl = inst_cpl.loc[common_idx, 'Lower']
-                lower_ff  = pd.to_numeric(inst_ff.loc[common_idx, 'Lower'], errors='coerce')
-                lower_cpl = pd.to_numeric(inst_cpl.loc[common_idx, 'Lower'], errors='coerce')
-                # Compter si Lower_CPL est vide OU si Lower_FF > Lower_CPL
-                nb_lower_ff_sup_cpl_short = (lower_cpl.isna() | (lower_ff >= lower_cpl)).sum()
-                lb_gap_pct_series = 100 - lower_cpl*100/lower_ff 
-
-                lb_gap_pct_series = lb_gap_pct_series[lower_cpl.notna() & (lower_cpl != 0) & lower_ff.notna()]
-
-                gap_lb_ff_vs_cpl_short = lb_gap_pct_series.mean() if not lb_gap_pct_series.empty else None
-                meanShortCPLDiff+= gap_lb_ff_vs_cpl_short
-
-            except Exception as e:
-                print(f"Erreur comparaison Lower FF/CPL dans {folder_name} : {e}")
+            nb_s, gap_ms = _compare_ff_cpl_lowers(
+                folder_path, short_tl_file, shortCPL_file, folder_name
+            )
+            if nb_s is not None:
+                nb_lower_ff_sup_cpl_short = nb_s
+            if gap_ms is not None:
+                meanShortCPLDiff += gap_ms
 
         ws.append([])
         current_row += 1
@@ -703,7 +768,6 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
             ws.append(recap_row)
             current_row += 1
 
-        # COMPARAISONs TL=14400 vs TL=14400 (FF)
         if long_tl_file and short_tl_file:
             long_stats = next(s for s in csv_stats if s['is_long_tl'])
             short_stats = next(s for s in csv_stats if s['is_short_tl'])
@@ -727,7 +791,6 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
             ws.append(["Écart moyennes GAP (%)", f"{gap_diff_pct:.2f}%"])
             current_row += 1
 
-        # COMPARAISONs CPL
         if longCPL_file and shortCPL_file:
             long_stats = next(s for s in csv_stats if s['is_long_cpl'])
             short_stats = next(s for s in csv_stats if s['is_short_cpl'])
@@ -743,19 +806,8 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
             total_Feas_plus += feas_plus
             total_gap_diffs_cpl.append(gap_diff_pct)
 
-        # Formater la feuille
-        for row in ws.iter_rows():
-            for cell in row:
-                if isinstance(cell.value, str) and cell.value.startswith('---'):
-                    cell.font = Font(bold=True)
-                elif isinstance(cell.value, str) and cell.value.startswith('Stat:'):
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-                elif isinstance(cell.value, str) and ("RÉCAPITULATIF" in cell.value or "COMPARAISON" in cell.value):
-                    cell.font = Font(bold=True, size=12)
-                    cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+        _style_instance_sheet(ws)
 
-        # Ligne LaTeX pour ce dossier
         if long_tl_file:
             mean_deviation_for_ff= format_pct(mean_deviation_for_ff)
             mean_gap_ub_lower_for_ff = format_pct(mean_gap_ub_lower_for_ff)
@@ -766,9 +818,6 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
             latex_table_5+=f"{folder_name} & {cpl_opt} & {cpl_feas} & {cpl_gap_avg:.3f}\\% & "
             latex_table_5+=f"{ff_opt} & {ff_feas} & {ff_gap_avg:.3f}\\% & "
             latex_table_5+=f"{ub_small_count} & {dev_str}\\% & {gapub_str}\\% \\\\ \n"
-            #print(f"{folder_name} & {cpl_opt} & {cpl_feas} & {cpl_gap_avg:.3f}\\% & "
-            #      f"{ff_opt} & {ff_feas} & {ff_gap_avg:.3f}\\% & "
-            #     f"{ub_small_count} & {dev_str}\\% & {gapub_str}\\% \\\\")
         
 
         if short_tl_file:
@@ -781,92 +830,78 @@ def process_csv_files(base_directory, output_file="resultats_combinesV2.xlsx"):
             latex_table_4+=f"{folder_name} & {cpl_opt_short} & {cpl_feas_short} & {cpl_gap_avg_short:.3f}\\ \\% & "
             latex_table_4+=f"{ff_opt_short} & {ff_feas_short} & {ff_gap_avg_short:.3f}\\ \\% & "
             latex_table_4+=f"{ub_small_count_short} & {dev_str_short}\\ \\% & {gapub_str}\\ \\% \\\\ \n"
-            #print(f"{folder_name} & {cpl_opt} & {cpl_feas} & {cpl_gap_avg:.3f}\\\% & "
-            #      f"{ff_opt} & {ff_feas} & {ff_gap_avg:.3f}\\\% & "
-            #     f"{ub_small_count} & {dev_str}\\\% & {gapub_str}\\\% \\\\")
-            if(inst10):
-                n=0
-            if(inst20):
-                n=1
-            if(inst30):
-                n=2
 
-            ub_gap_all=0
-            for i in range(len(temp_ub_column_all[n])):
-                ub_gap_all+=((temp_ub_column_all[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-            ub_gap_all/=len(temp_ub_column_all[n])
-            aver_ubgap_all[n]+=ub_gap_all
-
-            ub_gap_IC=0
-            for i in range(len(temp_ub_column_ic[n])):
-                ub_gap_IC+=((temp_ub_column_ic[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-
-            ub_gap_IC/=len(temp_ub_column_ic[n])
-            aver_ubgpa_ic[n]+=ub_gap_IC  
-            ub_gap_MS=0
-            for i in range(len(temp_ub_column_ms[n])):
-                ub_gap_MS+=((temp_ub_column_ms[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-            ub_gap_MS/=len(temp_ub_column_ms[n])
-            aver_ubgap_ms[n]+=ub_gap_MS
-            ub_gap_RS=0
-            for i in range(len(temp_ub_column_rs[n])):
-                ub_gap_RS+=((temp_ub_column_rs[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-            ub_gap_RS/=len(temp_ub_column_rs[n])
-            aver_ubgap_rs[n]+=ub_gap_RS
-            ub_gap_GAP=0
-            for i in range(len(temp_ub_column_gap[n])):
-                ub_gap_GAP+=((temp_ub_column_gap[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-            ub_gap_GAP/=len(temp_ub_column_gap[n])
-            aver_ubgap_gap[n]+=ub_gap_GAP
-            ub_gap_FF=0
-            for i in range(len(temp_ub_column_ff[n])):
-                ub_gap_FF+=((temp_ub_column_ff[n][i]-temp_ub_column_all[n][i])/temp_ub_column_all[n][i])*100
-            ub_gap_FF/=len(temp_ub_column_ff[n])
-            aver_ubgap_ff[n]+=ub_gap_FF
-            
+            ref_ub = temp_ub_column_all[n]
+            aver_ubgpa_ic[n] += _mean_relative_ub_gap_pct(ref_ub, temp_ub_column_ic[n])
+            aver_ubgap_ms[n] += _mean_relative_ub_gap_pct(ref_ub, temp_ub_column_ms[n])
+            aver_ubgap_rs[n] += _mean_relative_ub_gap_pct(ref_ub, temp_ub_column_rs[n])
+            aver_ubgap_gap[n] += _mean_relative_ub_gap_pct(ref_ub, temp_ub_column_gap[n])
+            aver_ubgap_ff[n] += _mean_relative_ub_gap_pct(ref_ub, temp_ub_column_ff[n])
+            aver_ubgap_all[n] += _mean_relative_ub_gap_pct(ref_ub, ref_ub)
     
         if longCPL_file:
             mean_deviation_for_ff= format_pct(mean_deviation_for_ff)
             mean_gap_ub_lower_for_ff = format_pct(mean_gap_ub_lower_for_ff)
             cpl_gap_avg  = format_pct(cpl_gap_avg)
             ff_gap_avg = format_pct(ff_gap_avg)
-        #Tableau LaTeX LB
+
         if long_tl_file :
             latex_table_6+=f"{folder_name} & {cpl_short_lb:.3f} & {ff_short_lb:.3f} & {nb_lower_ff_sup_cpl_short} & {cpl_long_lb:.3f} & {ff_long_lb:.3f} & {nb_lower_ff_sup_cpl_long} \\\\ \n"
-            #print(f"{folder_name} & {cpl_short_lb:.3f} & {ff_short_lb:.3f} & {nb_lower_ff_sup_cpl_short} & {cpl_long_lb:.3f} & {ff_long_lb:.3f} & {nb_lower_ff_sup_cpl_long} \\\\")
 
-    latex_table_7+=f"All & {aver_opt_all[0]} & {aver_gap_all[0]/12:.3f} & {aver_ubgap_all[0]/12:.3f} & {aver_opt_all[1]} & {aver_gap_all[1]/12:.3f} & {aver_ubgap_all[1]/12:.3f} & {aver_opt_all[2]} & {aver_gap_all[2]/12:.3f} & {aver_ubgap_all[2]/12:.3f} \\\\  \n"
-    latex_table_7+=f"IC & {aver_opt_ic[0]} & {aver_gap_ic[0]/12:.3f} & {aver_ubgpa_ic[0]/12:.3f} & {aver_opt_ic[1]} & {aver_gap_ic[1]/12:.3f} & {aver_ubgpa_ic[1]/12:.3f} & {aver_opt_ic[2]} & {aver_gap_ic[2]/12:.3f} & {aver_ubgpa_ic[2]/12:.3f} \\\\ \n"
-    latex_table_7+=f"GAP & {aver_opt_gap[0]} & {aver_gap_gap[0]/12:.3f} & {aver_ubgap_gap[0]/12:.3f} & {aver_opt_gap[1]} & {aver_gap_gap[1]/12:.3f} & {aver_ubgap_gap[1]/12:.3f} & {aver_opt_gap[2]} & {aver_gap_gap[2]/12:.3f} & {aver_ubgap_gap[2]/12:.3f} \\\\ \n"
-    latex_table_7+=f"MS & {aver_opt_ms[0]} & {aver_gap_ms[0]/12:.3f} & {aver_ubgap_ms[0]/12:.3f} & {aver_opt_ms[1]} & {aver_gap_ms[1]/12:.3f} & {aver_ubgap_ms[1]/12:.3f} & {aver_opt_ms[2]} & {aver_gap_ms[2]/12:.3f} & {aver_ubgap_ms[2]/12:.3f} \\\\ \n"
-    latex_table_7+=f"RS & {aver_opt_rs[0]} & {aver_gap_rs[0]/12:.3f} & {aver_ubgap_rs[0]/12:.3f} & {aver_opt_rs[1]} & {aver_gap_rs[1]/12:.3f} & {aver_ubgap_rs[1]/12:.3f} & {aver_opt_rs[2]} & {aver_gap_rs[2]/12:.3f} & {aver_ubgap_rs[2]/12:.3f} \\\\ \n"
-    latex_table_7+=f"FF & {aver_opt_ff[0]} & {aver_gap_ff[0]/12:.3f} & {aver_ubgap_ff[0]/12:.3f} & {aver_opt_ff[1]} & {aver_gap_ff[1]/12:.3f} & {aver_ubgap_ff[1]/12:.3f} & {aver_opt_ff[2]} & {aver_gap_ff[2]/12:.3f} & {aver_ubgap_ff[2]/12:.3f} \\\\ \n"
-    latex_table_7+=f"DEF & {aver_opt_def[0]} & {aver_gap_def[0]/12:.3f} & - & {aver_opt_def[1]} & {aver_gap_def[1]/12:.3f} & - & {aver_opt_def[2]} & {aver_gap_def[2]/12:.3f} & - \\\\ \\hline \n"
-    latex_table_7+="\\end{tabular} \n"
-    latex_table_7+="\\end{table} \n"
-    latex_table_6+="\\hline \n"
-    latex_table_6+="\\end{tabular} \n"
-    latex_table_6+="\\end{table} \n"
-    latex_table_5+="\\hline \n"
-    latex_table_5+="\\end{tabular} \n"
-    latex_table_5+="\\end{table} \n"
-    latex_table_4+="\\hline \n"
-    latex_table_4+="\\end{tabular} \n"
-    latex_table_4+="\\end{table} \n"
+    latex_table_7 = _append_latex_table7_aggregate_rows(
+        latex_table_7,
+        aver_opt_all=aver_opt_all,
+        aver_gap_all=aver_gap_all,
+        aver_ubgap_all=aver_ubgap_all,
+        aver_opt_ic=aver_opt_ic,
+        aver_gap_ic=aver_gap_ic,
+        aver_ubgpa_ic=aver_ubgpa_ic,
+        aver_opt_gap=aver_opt_gap,
+        aver_gap_gap=aver_gap_gap,
+        aver_ubgap_gap=aver_ubgap_gap,
+        aver_opt_ms=aver_opt_ms,
+        aver_gap_ms=aver_gap_ms,
+        aver_ubgap_ms=aver_ubgap_ms,
+        aver_opt_rs=aver_opt_rs,
+        aver_gap_rs=aver_gap_rs,
+        aver_ubgap_rs=aver_ubgap_rs,
+        aver_opt_ff=aver_opt_ff,
+        aver_gap_ff=aver_gap_ff,
+        aver_ubgap_ff=aver_ubgap_ff,
+        aver_opt_def=aver_opt_def,
+        aver_gap_def=aver_gap_def,
+    )
+    latex_table_6 = _latex_close_outer_table(latex_table_6)
+    latex_table_5 = _latex_close_outer_table(latex_table_5)
+    latex_table_4 = _latex_close_outer_table(latex_table_4)
 
     wb.save(output_file)
-    latex_table_3 = "\\begin{table}[h!] \n \\centering \n \\setlength{\\tabcolsep}{3pt} \n \\footnotesize \n \\arrayrulecolor{black} \\\\% Bordures en bleu \n \\color{black} \n \\begin{tabular}{|c|ccc|ccc|ccc|} \n \\hline \n  &  $MILP_{1h}$    &  $LBBD_{1h}$   &  Heuristic \\\\\n Instance &  \\#Opt & \\#Feasible & $\\overline{Gap}$ & \\#Opt & \\#Feasible & $\\overline{Gap}$ &  \\#Feasible & $\\overline{Gap_{UB}}$ &  $\\overline{Gap_{LB}}$  \\\\ \\hline \n"
-    latex_table_3 += "\\begin{tabular}{|c|c c| c c| c c|} \n \\hline \n"
-    latex_table_3 += " & \\multicolumn{2}{c|}{10 customers} & \\multicolumn{2}{c|}{20 customers} & \\multicolumn{2}{c|}{30 customers} \\\\\n"
-    latex_table_3 += " & 1h & 4h  & 1h & 4h & 1h & 4h \\\\\n"
-    latex_table_3 += "\\hline \n"
-    latex_table_3 += f"Average number of iterations & {aver_ite10_Short/12:.3f} & {aver_ite10_Long/12:.3f} & {aver_ite20_Short/12:.3f} & {aver_ite20_Long/12:.3f} & {aver_ite30_Short/12:.3f} & {aver_ite30_Long/12:.3f} \\\\\n"
-    latex_table_3 += f"Average master solving time (s) & {aver_MSolving10_Short/12:.3f} & {aver_MSolving10_Long/12:.3f} & {aver_MSolving20_Short/12:.3f} & {aver_MSolving20_Long/12:.3f} & {aver_MSolving30_Short/12:.3f} & {aver_MSolving30_Long/12:.3f} \\\\\n"
-    latex_table_3 += f"Average subproblem solving time (s) & {aver_Subsolving10_Short/12:.3f} & {aver_Subsolving10_Long/12:.3f} & {aver_Subsolving20_Short/12:.3f} & {aver_Subsolving20_Long/12:.3f} & {aver_Subsolving30_Short/12:.3f} & {aver_Subsolving30_Long/12:.3f} \\\\\n"
-    latex_table_3 += f"Average final number of benders cuts & {aver_BendersCuts10_Short/12:.3f} & {aver_BendersCuts10_Long/12:.3f} & {aver_BendersCuts20_Short/12:.3f} & {aver_BendersCuts20_Long/12:.3f} & {aver_BendersCuts30_Short/12:.3f} & {aver_BendersCuts30_Long/12:.3f} \\\\\n"
-    latex_table_3 += "\\hline \n"
-    latex_table_3 += "\\end{tabular} \n"
-    latex_table_3 += "\\end{table} \n"
+    latex_table_3 = _build_latex_table3_runtime_totals(
+        aver_ite10_Short=aver_ite10_Short,
+        aver_ite10_Long=aver_ite10_Long,
+        aver_ite20_Short=aver_ite20_Short,
+        aver_ite20_Long=aver_ite20_Long,
+        aver_ite30_Short=aver_ite30_Short,
+        aver_ite30_Long=aver_ite30_Long,
+        aver_MSolving10_Short=aver_MSolving10_Short,
+        aver_MSolving10_Long=aver_MSolving10_Long,
+        aver_MSolving20_Short=aver_MSolving20_Short,
+        aver_MSolving20_Long=aver_MSolving20_Long,
+        aver_MSolving30_Short=aver_MSolving30_Short,
+        aver_MSolving30_Long=aver_MSolving30_Long,
+        aver_Subsolving10_Short=aver_Subsolving10_Short,
+        aver_Subsolving10_Long=aver_Subsolving10_Long,
+        aver_Subsolving20_Short=aver_Subsolving20_Short,
+        aver_Subsolving20_Long=aver_Subsolving20_Long,
+        aver_Subsolving30_Short=aver_Subsolving30_Short,
+        aver_Subsolving30_Long=aver_Subsolving30_Long,
+        aver_BendersCuts10_Short=aver_BendersCuts10_Short,
+        aver_BendersCuts10_Long=aver_BendersCuts10_Long,
+        aver_BendersCuts20_Short=aver_BendersCuts20_Short,
+        aver_BendersCuts20_Long=aver_BendersCuts20_Long,
+        aver_BendersCuts30_Short=aver_BendersCuts30_Short,
+        aver_BendersCuts30_Long=aver_BendersCuts30_Long,
+    )
     
     print(latex_table_3)
     print(latex_table_4)

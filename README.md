@@ -113,3 +113,10 @@ You can generate new instances using the instance generator :
 - `K` — number of products
 - `PP` — number of products per producers
 - `CC` — number of producers producing the same set of products. For example with 6 producers if CC=2 then we have 3 groups of 2 producers having the same set of products. If CC=3 then we have 2 groups of 3 producers having the same set of products.
+
+## Results
+You can find individual results for each instance and each configurations, in the .csv files.
+
+The helper script **`Instance/readSol.py`** loads every `*.csv` in those directories, merges them into an Excel workbook for inspection, and prints **LaTeX table fragments** summarizing the results.
+This python script requires the dependencies openpyxl and pandas.
+
